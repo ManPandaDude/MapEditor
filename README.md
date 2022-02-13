@@ -1,4 +1,5 @@
 # MapEditor
+Made with python and pygame.
 A gui tile based map editor.
 
 Uses json files for maps.
