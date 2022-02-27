@@ -5,7 +5,7 @@ from tkinter import Tk
 from tkinter.filedialog import askopenfilename, asksaveasfile, askdirectory
 import data.scripts.text as scripts_text
 import json
-#after separate map editor from main game and put it on github
+
 # Init
 os.environ['SDL_VIDEO_WINDOW_POS'] = str(0) + "," + str(23)  # Sets pos of window to (0, 23)
 Tk().withdraw()
@@ -229,6 +229,7 @@ jumbo_purple_font = scripts_text.Font("data/fonts/large_font.png", dark_purple, 
 # Buttons
 class TextButton:
     """Button made from text"""
+
     def __init__(self, font1, font2, text, surf, position, num_x=0):
         self.font1 = font1  # Default font used
         self.font2 = font2  # Font used for mouse over
@@ -268,6 +269,7 @@ class TextButton:
 
 class ImageButton:
     """Button made from images"""
+
     def __init__(self, surf1, surf2, position, num_x=0):
         self.surf1 = surf1  # Default image for button
         self.surf2 = surf2  # Image for button hover
@@ -307,11 +309,11 @@ exit_button = TextButton(purple_menu_font1, purple_menu_font2, "Exit", screen,  
                          (screen.get_width() / 2 - purple_menu_font1.width("Exit")[-1] / 2, 675), )
 
 tiles_path_button = TextButton(purple_menu_font1, purple_menu_font2, "Tiles Path", screen,  # Tiles path button for settings
-                         (screen.get_width() / 2 - purple_menu_font1.width("Tiles Path")[-1] / 2, 285), )
+                               (screen.get_width() / 2 - purple_menu_font1.width("Tiles Path")[-1] / 2, 285), )
 spritesheets_path_button = TextButton(purple_menu_font1, purple_menu_font2, "Spritesheets Path", screen,  # Spritesheets path button for settings
-                         (screen.get_width() / 2 - purple_menu_font1.width("Spritesheets Path")[-1] / 2, 415), )
+                                      (screen.get_width() / 2 - purple_menu_font1.width("Spritesheets Path")[-1] / 2, 415), )
 maps_path_button = TextButton(purple_menu_font1, purple_menu_font2, "Map Folder", screen,  # Maps path button for settings
-                         (screen.get_width() / 2 - purple_menu_font1.width("Map Folder")[-1] / 2, 545), )
+                              (screen.get_width() / 2 - purple_menu_font1.width("Map Folder")[-1] / 2, 545), )
 back_button = TextButton(purple_menu_font1, purple_menu_font2, "Back", screen,  # Back button for settings
                          (screen.get_width() / 2 - purple_menu_font1.width("Back")[-1] / 2, 675), )
 
@@ -560,8 +562,8 @@ def erase_tile(_zoom, layer_, offset_):
 
                     for i_ in tile_map["map"][chunk_pos_][pos_]:  # Loops through tile and blits all layers
                         if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
-                            screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]), (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size)
-                                                                                                 - scroll[1]))
+                            screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]), (int(tile_pos_[0] * tile_size) - scroll[0],
+                                                                                                 int(tile_pos_[1] * tile_size) - scroll[1]))
                         else:
                             screen.blit((tile_index["null"]),
                                         (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
@@ -772,7 +774,6 @@ while running:  # Main loop
                 json.dump(settings, file, indent=0)  # Writes settings to settings file
                 file.close()  # Closes file
 
-
         display.blit(screen, (0, 0))  # Blits screen
 
     # Editor -----------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -852,8 +853,24 @@ while running:  # Main loop
                     if rect_image_dict[tab][key].collidepoint(mouse):  # If mouse is over tile and mouse left click:
                         selection = key  # Sets selection to clicked tile
 
+                # Position of tile player is mousing over
+                tile_position = [round(((mouse[0] - offset[0]) + round(scroll[0]))), round(((mouse[1] - offset[1]) + round(scroll[1])))]
+
+                # By default, it zooms zoom to the center of the screen, adding zoom_mouse_offset zooms to the mouse cursor
+                zoom_mouse_offset = [mouse[0], mouse[1]]
+                if zoom_mouse_offset[0] > screen.get_width() / 2:
+                    zoom_mouse_offset[0] = zoom_mouse_offset[0] - (screen.get_width() / 2)
+                elif zoom_mouse_offset[0] < screen.get_width() / 2:
+                    zoom_mouse_offset[0] = -((screen.get_width() / 2) - zoom_mouse_offset[0])
+
+                if zoom_mouse_offset[1] > screen.get_height() / 2:
+                    zoom_mouse_offset[1] = zoom_mouse_offset[1] - (screen.get_height() / 2)
+                elif zoom_mouse_offset[1] < screen.get_height() / 2:
+                    zoom_mouse_offset[1] = -((screen.get_height() / 2) - zoom_mouse_offset[1])
+
                 # Zoom
                 if event.button == 4:  # If mouse scroll up
+
                     # If mouse isn't colliding with sidebar:
                     if mouse[0] > sidebar_img.get_width():  # if mouse[0] > 383 and mouse_rect.x < 1856 and mouse_rect.y > 96 and mouse_rect.y < 1024:
                         if zoom < 4:  # If zoom is less than max zoom:
@@ -864,18 +881,30 @@ while running:  # Main loop
                                 tile_index, ui_images = scale_tiles(tile_index, ui_images, "*")  # Scales tiles
                                 # Scales player_img
                                 player_img = pygame.transform.scale(orig_player_img, (orig_player_img.get_width() * zoom, orig_player_img.get_height() * zoom))
-
+                                # Modifies zoom so that screen zooms in around mouse
+                                scroll = [((tile_position[0] * 2) - 928 - zoom_mouse_offset[0]),
+                                          ((tile_position[1] * 2) - 496 - zoom_mouse_offset[1])]
+                                if zoom > 2:
+                                    scroll = [(tile_position[0] * 2) - 896 - zoom_mouse_offset[0],
+                                              (tile_position[1] * 2) - 464 - zoom_mouse_offset[1]]
                             elif zoom < 0:  # If zoom is zoomed out
                                 tile_size = 32 / abs(zoom)  # Divides tile_size by zoom
                                 tile_index, ui_images = scale_tiles(tile_index, ui_images, "/")  # Scales tiles
                                 # Scales player_img
                                 player_img = pygame.transform.scale(orig_player_img, (round(orig_player_img.get_width() / abs(zoom)), round(orig_player_img.get_height()
                                                                                                                                             / abs(zoom))))
+                                # Modifies zoom so that screen zooms in around mouse
+                                scroll = [((tile_position[0] * 2) - 952) - zoom_mouse_offset[0],
+                                          ((tile_position[1] * 2) - 520) - zoom_mouse_offset[1]]
                             else:  # If zoom is neither
                                 tile_size = 32  # Sets tile size to default
                                 tile_index, ui_images = scale_tiles(tile_index, ui_images)  # Sets tiles to default scale
                                 player_img = orig_player_img.copy()  # Sets player_img to default scale
+                                # Modifies zoom so that screen zooms in around mouse
+                                scroll = [((tile_position[0] * 2) - 944 - zoom_mouse_offset[0]),
+                                          ((tile_position[1] * 2) - 512 - zoom_mouse_offset[1])]
                             update = True  # Flag to redraw every tile on screen
+
                 # Zoom
                 elif event.button == 5:  # If mouse scroll down
                     # If mouse isn't colliding with sidebar:
@@ -888,6 +917,9 @@ while running:  # Main loop
                                 tile_index, ui_images = scale_tiles(tile_index, ui_images, "*")  # Scales tiles
                                 # Scales player_img
                                 player_img = pygame.transform.scale(orig_player_img, (orig_player_img.get_width() * zoom, orig_player_img.get_height() * zoom))
+                                # Modifies zoom so that screen zooms out around mouse
+                                scroll = [((tile_position[0] / 2) - 928 - zoom_mouse_offset[0]),
+                                          ((tile_position[1] / 2) - 496 - zoom_mouse_offset[1])]
 
                             elif zoom < 0:  # If zoom is zoomed out
                                 tile_size = 32 / abs(zoom)  # Divides tile_size by zoom
@@ -895,10 +927,19 @@ while running:  # Main loop
                                 # Scales player_img
                                 player_img = pygame.transform.scale(orig_player_img, (round(orig_player_img.get_width() / abs(zoom)), round(orig_player_img.get_height()
                                                                                                                                             / abs(zoom))))
+                                # Modifies zoom so that screen zooms out around mouse
+                                scroll = [((tile_position[0] / 2) - 952 - zoom_mouse_offset[0]),
+                                          ((tile_position[1] / 2) - 520 - zoom_mouse_offset[1])]
+                                if zoom < -2:
+                                    scroll = [((tile_position[0] / 2) - 956 - zoom_mouse_offset[0]),
+                                              ((tile_position[1] / 2) - 524 - zoom_mouse_offset[1])]
                             else:  # If zoom is neither
                                 tile_size = 32  # Sets tile size to default
                                 tile_index, ui_images = scale_tiles(tile_index, ui_images)  # Sets tiles to default scale
                                 player_img = orig_player_img.copy()  # Sets player_img to default scale
+                                # Modifies zoom so that screen zooms out around mouse
+                                scroll = [((tile_position[0] / 2) - 944 - zoom_mouse_offset[0]),
+                                          ((tile_position[1] / 2) - 512 - zoom_mouse_offset[1])]
                             update = True  # Flag to redraw every tile on screen
 
             # On mouse button up the screen updates all tiles
@@ -1207,7 +1248,7 @@ while running:  # Main loop
                         # Blits null image
                         display.blit(tile_index["null"], (round(((mouse[0] - offset[0]) + mouse_scroll[0]) / tile_size) * tile_size - mouse_scroll[0],
                                                           round(((mouse[1] - offset[1]) + mouse_scroll[1]) / tile_size) * tile_size - mouse_scroll[1]))
-        display.blit(sidebar_img, (0, 0))  # Blits sidebar image
+        # display.blit(sidebar_img, (0, 0))  # Blits sidebar image
         chunk_pos = chunk_pos.replace(";", ":")  # Makes chunk_pos readable by the white_font.render
         # Renders chunk and tile positions
         white_font.render("Chunk: " + chunk_pos + "   Tile: " + str(tile_position[0]) + ":" + str(tile_position[1]), display, (420, 2))
