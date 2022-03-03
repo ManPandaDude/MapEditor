@@ -67,19 +67,17 @@ class Font:
         self.scale = scale_multiplier
 
     def width(self, text):
-        text_width = [0]
+        text_width = 0
         for char in text:
 
             if char not in ['\n', ' ']:
-                text_width[-1] += self.letters[self.font_order.index(char)].get_width() + self.base_spacing * self.scale
+                text_width += self.letters[self.font_order.index(char)].get_width() + self.base_spacing * self.scale
             elif char == ' ':
-                text_width[-1] += (self.space_width + self.base_spacing) * self.scale
+                text_width += (self.space_width + self.base_spacing) * self.scale
             elif char == '\n':
-                text_width[-1] -= self.base_spacing * self.scale
-                text_width.append(0)
+                text_width -= self.base_spacing * self.scale
 
-        text_width[-1] -= self.base_spacing * self.scale
-        text_width.sort()
+        text_width -= self.base_spacing * self.scale
         return text_width
 
     def height(self, text):
