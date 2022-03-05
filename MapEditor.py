@@ -1,4 +1,4 @@
-import pygame
+import pygame as pg
 import os
 from shutil import copyfile
 from tkinter import Tk
@@ -10,11 +10,11 @@ import time
 # Init
 os.environ['SDL_VIDEO_WINDOW_POS'] = str(0) + "," + str(23)  # Sets pos of window to (0, 23)
 Tk().withdraw()
-pygame.init()
+pg.init()
 WINDOW_SIZE = (1920, 1056)
-display = pygame.display.set_mode(WINDOW_SIZE, pygame.SCALED + pygame.RESIZABLE)
-screen = pygame.Surface(WINDOW_SIZE)
-pygame.display.set_caption("Map Editor")
+display = pg.display.set_mode(WINDOW_SIZE, pg.SCALED + pg.RESIZABLE)
+screen = pg.Surface(WINDOW_SIZE)
+pg.display.set_caption("Map Editor")
 
 # Colors
 very_dark_purple = (31, 24, 60)
@@ -25,20 +25,26 @@ img_colorkey = (0, 0, 0)
 bg_color = (15, 15, 15)
 
 # Images
-null_img = pygame.transform.scale(pygame.image.load('data/null.png').convert(), (32, 32))
-background_img = pygame.image.load('data/background.png').convert()
-sidebar_img = pygame.transform.scale(pygame.image.load('data/editor gui.png').convert(), (416, 1056))
+null_img = pg.transform.scale(pg.image.load('data/null.png').convert(), (32, 32))
+background_img = pg.image.load('data/background.png').convert()
+sidebar_img = pg.transform.scale(pg.image.load('data/editor gui.png').convert(), (428, 1056))
 sidebar_img.set_colorkey(img_colorkey)
-tiny_mouse_dot_img = pygame.image.load('data/mouse.png').convert()
-right_arrow1 = pygame.transform.scale(pygame.image.load('data/arrow1.png').convert_alpha(), (32, 32))
-right_arrow2 = pygame.transform.scale(pygame.image.load('data/arrow2.png').convert_alpha(), (32, 32))
-left_arrow1 = pygame.transform.flip(right_arrow1, True, False)
-left_arrow2 = pygame.transform.flip(right_arrow2, True, False)
-orig_player_img = pygame.image.load('data/player.png').convert()
-orig_player_img = pygame.transform.scale(orig_player_img, (orig_player_img.get_width() * 2, orig_player_img.get_height() * 2))
+sidebar_arrow_img = pg.transform.scale(pg.image.load('data/sidebar_arrow.png').convert(), (18, 1056))
+sidebar_arrow_img.set_colorkey(img_colorkey)
+sidebar_arrow_img2 = pg.transform.scale(pg.image.load('data/sidebar_arrow2.png').convert(), (18, 1056))
+sidebar_arrow_img2.set_colorkey(img_colorkey)
+tiny_mouse_dot_img = pg.image.load('data/mouse.png').convert()
+right_arrow1 = pg.transform.scale(pg.image.load('data/arrow1.png').convert_alpha(), (32, 32))
+right_arrow2 = pg.transform.scale(pg.image.load('data/arrow2.png').convert_alpha(), (32, 32))
+left_arrow1 = pg.transform.flip(right_arrow1, True, False)
+left_arrow2 = pg.transform.flip(right_arrow2, True, False)
+orig_player_img = pg.image.load('data/player.png').convert()
+orig_player_img = pg.transform.scale(orig_player_img, (orig_player_img.get_width() * 2, orig_player_img.get_height() * 2))
 orig_player_img.set_colorkey(img_colorkey)
 orig_player_img.set_alpha(150)
 player_img = orig_player_img.copy()
+
+sidebar_arrow_mask = pg.mask.from_surface(sidebar_arrow_img)
 
 tile_index = {"null": null_img}
 rect_image_dict = {"tiles": {}, "decorations": {}, "mobs": {}}  # Used for tabs inside of editor
@@ -88,7 +94,7 @@ def create_sidebar_image(rect_image_dict_, new_tile_index, image, name, gap):
 def clip(surf, x_, y_, x_size, y_size):
     """Clips image based on x and y"""
     handle_surf = surf.copy()
-    clip_rect = pygame.Rect(x_, y_, x_size, y_size)
+    clip_rect = pg.Rect(x_, y_, x_size, y_size)
     handle_surf.set_clip(clip_rect)
     image = surf.subsurface(handle_surf.get_clip())
     return image.copy()
@@ -99,7 +105,7 @@ def load_spritesheet(path, new_tile_index, rect_image_dict_, scale=2):
     row_content = {}
     new_ui_images = {}
     rows = []
-    spritesheet_ = pygame.image.load(path).convert()
+    spritesheet_ = pg.image.load(path).convert()
     spritesheet_.set_colorkey((0, 0, 0))
     name = path.split("/")[-1].split(".")[0]
     # looks down and stores the positions of all pink pixels in row variable
@@ -137,7 +143,7 @@ def load_spritesheet(path, new_tile_index, rect_image_dict_, scale=2):
 
                 # Cuts image out and adds it to the list
                 img = clip(spritesheet_, x_ + 1, row + 1, x2_ - 1, y2_ - 1)
-                img = pygame.transform.scale(img, (img.get_width() * scale, img.get_height() * scale))
+                img = pg.transform.scale(img, (img.get_width() * scale, img.get_height() * scale))
                 img.set_colorkey((255, 255, 255))
                 row_content[name + str(i_)] = img
                 rect_image_dict_, new_tile_index, image_rect = create_sidebar_image(rect_image_dict_, new_tile_index, img, name + str(i_), 5)
@@ -159,14 +165,14 @@ def load_saved_images(path, rect_image_dict_, new_tile_index, scale=2):
             if (entry.path.endswith(".png") or entry.path.endswith(".jpg") or entry.path.endswith(".PNG") or entry.path.endswith(".JPG")) and entry.is_file():
 
                 if path == settings["spritesheets_path"] + "/":
-                    image = pygame.image.load(entry.path).convert()
+                    image = pg.image.load(entry.path).convert()
                     image.set_colorkey(img_colorkey)
                     spritesheet, rect_image_dict_, new_tile_index, new_ui_images = load_spritesheet(path + entry.name, tile_index, rect_image_dict)
 
                 else:
-                    image = pygame.image.load(entry.path).convert()
+                    image = pg.image.load(entry.path).convert()
                     image.set_colorkey(img_colorkey)
-                    image = pygame.transform.scale(image, (image.get_width() * scale, image.get_height() * scale))
+                    image = pg.transform.scale(image, (image.get_width() * scale, image.get_height() * scale))
                     name = os.path.splitext(entry.name)[0]
                     rect_image_dict_, new_tile_index, image_rect = create_sidebar_image(rect_image_dict_, new_tile_index, image, name, 5)
     new_ui_images = new_tile_index.copy()
@@ -196,21 +202,21 @@ tab = "tiles"
 tile_map = {}
 selection = None
 tile_size = 32
-mouse = pygame.mouse.get_pos()
-mouse_rect = pygame.Rect(mouse, (1, 1))
+mouse = pg.mouse.get_pos()
+mouse_rect = pg.Rect(mouse, (1, 1))
 scroll = [0, 0]
 zoom = 0
 update = False
 map_file_path = ""
 error = ""
-old_pressed = pygame.mouse.get_pressed(3)[1]
+old_pressed = pg.mouse.get_pressed(3)[1]
 pixels_scrolled = [0, 0]
 screen_copy = screen.copy()
 tile_pos = [0, 0]
 tile_range = [34, 60]
 offset = [16, 16]
-left_mouse_button = False
-clock = pygame.time.Clock()
+left_mouse_btn_down = False
+clock = pg.time.Clock()
 current_layer = "0"
 layer_dict = {}
 undo_list = []
@@ -219,7 +225,8 @@ current_time = time.time()
 last_time = time.time()
 holding_down = False
 undo_redo_flag = False
-
+sidebar_hidden = False
+mouse_over_gui = False
 
 # Fonts
 white_font = scripts_text.Font("data/fonts/large_font.png", (240, 240, 240), img_colorkey, 1, )
@@ -250,7 +257,7 @@ class TextButton:
 
     def update(self, _pressed):
         """Draws button and handles button function by setting clicked to True or False depending on if button was clicked or not."""
-        mouse_ = pygame.mouse.get_pos()
+        mouse_ = pg.mouse.get_pos()
         self.clicked = False
 
         # If mouse is over button and clicking:
@@ -275,6 +282,7 @@ class TextButton:
 
 class ImageButton:
     """Button made from images"""
+
     def __init__(self, surf1, surf2, position, num_x=0):
         self.surf1 = surf1
         self.surf2 = surf2
@@ -287,7 +295,7 @@ class ImageButton:
 
     def update(self, _pressed):
         """Blits button to screen"""
-        _mouse = pygame.mouse.get_pos()
+        _mouse = pg.mouse.get_pos()
         self.clicked = False
 
         # If mouse is over button and clicking:
@@ -346,9 +354,9 @@ def load_image(rect_image_dict_, path, new_tile_index, ui_images_):
 
     copyfile(file_path, path + str(basename))
     gap = 5
-    image = pygame.image.load(file_path).convert()
+    image = pg.image.load(file_path).convert()
     image.set_colorkey(img_colorkey)
-    image = pygame.transform.scale(image, (image.get_width() * 2, image.get_height() * 2))
+    image = pg.transform.scale(image, (image.get_width() * 2, image.get_height() * 2))
     image_rect = image.get_rect()
 
     if name[0:5] == "enemy":
@@ -435,7 +443,7 @@ def load_map(current_map_file_path=None, current_map_file=None, layer_dictionary
             layer_dict_ = {}
 
             for i_ in data["all_layers"]:
-                layer_dict_[str(i_)] = pygame.Surface(WINDOW_SIZE)
+                layer_dict_[str(i_)] = pg.Surface(WINDOW_SIZE)
                 layer_dict_[str(i_)].set_colorkey(bg_color)
 
             return data, file_name, None, "editor", layer_dict_  # Returns stuff, except for the error, which is returned to None
@@ -510,192 +518,192 @@ def calculate_line(x1, y1, x2, y2, fun, _zoom, layer_, offset_, selection_):
 def draw_tile(_zoom, layer_, offset_, selection_, specific_tile=None):
     """Draws tiles and enemies"""
 
-    if mouse_rect.x > sidebar_img.get_width() or specific_tile is not None:
-
-        old_tile = None
-        tile_pos_ = [round(((mouse_rect.x - offset_[0]) + round(scroll[0])) / tile_size),
-                     round(((mouse_rect.y - offset_[1]) + round(scroll[1])) / tile_size)]
-        chunk_pos_ = str(int((tile_pos_[0]) / 8)) + ";" + str(int((tile_pos_[1]) / 8))
-        pos_ = str(tile_pos_[0]) + ";" + str(tile_pos_[1])
-
-        if specific_tile is not None:
-            pos_ = specific_tile.split(";")
-            pos_[0], pos_[1] = int(pos_[0]), int(pos_[1])
-            tile_pos_ = [pos_[0], pos_[1]]
+    if mouse_rect.x > sidebar_img.get_width() or specific_tile is not None or sidebar_hidden:
+        if not mouse_over_gui:
+            old_tile = None
+            tile_pos_ = [round(((mouse_rect.x - offset_[0]) + round(scroll[0])) / tile_size),
+                         round(((mouse_rect.y - offset_[1]) + round(scroll[1])) / tile_size)]
             chunk_pos_ = str(int((tile_pos_[0]) / 8)) + ";" + str(int((tile_pos_[1]) / 8))
             pos_ = str(tile_pos_[0]) + ";" + str(tile_pos_[1])
 
-        if selection_[:5] == "enemy":
+            if specific_tile is not None:
+                pos_ = specific_tile.split(";")
+                pos_[0], pos_[1] = int(pos_[0]), int(pos_[1])
+                tile_pos_ = [pos_[0], pos_[1]]
+                chunk_pos_ = str(int((tile_pos_[0]) / 8)) + ";" + str(int((tile_pos_[1]) / 8))
+                pos_ = str(tile_pos_[0]) + ";" + str(tile_pos_[1])
 
-            if chunk_pos_ not in tile_map["mobs"]:
-                tile_map["mobs"][chunk_pos_] = {}
+            if selection_[:5] == "enemy":
 
-            if pos_ not in tile_map["mobs"][chunk_pos_]:
-                tile_map["mobs"][chunk_pos_][pos_] = {}
+                if chunk_pos_ not in tile_map["mobs"]:
+                    tile_map["mobs"][chunk_pos_] = {}
 
-            if pos_ in tile_map["mobs"][chunk_pos_] and layer_ in tile_map["mobs"][chunk_pos_][pos_]:
-                old_tile = tile_map["mobs"][chunk_pos_][pos_][layer_][-1]
+                if pos_ not in tile_map["mobs"][chunk_pos_]:
+                    tile_map["mobs"][chunk_pos_][pos_] = {}
 
-            tile_map["mobs"][chunk_pos_][pos_][layer_] = [selection_]
+                if pos_ in tile_map["mobs"][chunk_pos_] and layer_ in tile_map["mobs"][chunk_pos_][pos_]:
+                    old_tile = tile_map["mobs"][chunk_pos_][pos_][layer_][-1]
 
-            if specific_tile is None and [pos_, layer_, "replace", selection, old_tile] not in undo_list and [pos_, layer_, "remove", selection_] not in undo_list:
-                if not old_tile == selection_:
-                    if old_tile is not None:
-                        undo_list.append([pos_, layer_, "replace", selection, old_tile])
-                    else:
-                        undo_list.append([pos_, layer_, "remove", selection_])
+                tile_map["mobs"][chunk_pos_][pos_][layer_] = [selection_]
 
-            tile_map["mobs"][chunk_pos_][pos_] = {key_: val for key_, val in sorted(tile_map["mobs"][chunk_pos_][pos_].items(), key=lambda ele: int(ele[0]))}
+                if specific_tile is None and [pos_, layer_, "replace", selection, old_tile] not in undo_list and [pos_, layer_, "remove", selection_] not in undo_list:
+                    if not old_tile == selection_:
+                        if old_tile is not None:
+                            undo_list.append([pos_, layer_, "replace", selection, old_tile])
+                        else:
+                            undo_list.append([pos_, layer_, "remove", selection_])
 
-            for i_ in tile_map["mobs"][chunk_pos_][pos_]:
-                screen.blit((tile_index[tile_map["mobs"][chunk_pos_][pos_][i_][0]]),
-                            (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+                tile_map["mobs"][chunk_pos_][pos_] = {key_: val for key_, val in sorted(tile_map["mobs"][chunk_pos_][pos_].items(), key=lambda ele: int(ele[0]))}
 
-        else:
-
-            if chunk_pos_ not in tile_map["map"]:
-                tile_map["map"][chunk_pos_] = {}
-
-            if pos_ not in tile_map["map"][chunk_pos_]:
-                tile_map["map"][chunk_pos_][pos_] = {}
-
-            if pos_ in tile_map["map"][chunk_pos_] and layer_ in tile_map["map"][chunk_pos_][pos_]:
-                old_tile = tile_map["map"][chunk_pos_][pos_][layer_][-1]
-
-            tile_map["map"][chunk_pos_][pos_][layer_] = [selection_]
-
-            if specific_tile is None and [pos_, layer_, "replace", selection, old_tile] not in undo_list and [pos_, layer_, "remove", selection_] not in undo_list:
-                if not old_tile == selection_:  # skips tiles that are the same as selection
-
-                    if old_tile is not None:
-                        undo_list.append([pos_, layer_, "replace", selection, old_tile])
-                    else:
-                        undo_list.append([pos_, layer_, "remove", selection_])
-
-            tile_map["map"][chunk_pos_][pos_] = {key_: val for key_, val in sorted(tile_map["map"][chunk_pos_][pos_].items(), key=lambda ele: int(ele[0]))}
-
-            for i_ in tile_map["map"][chunk_pos_][pos_]:
-
-                if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
-                    screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]),
+                for i_ in tile_map["mobs"][chunk_pos_][pos_]:
+                    screen.blit((tile_index[tile_map["mobs"][chunk_pos_][pos_][i_][0]]),
                                 (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
 
-                else:
-                    screen.blit((tile_index["null"]),
-                                (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+            else:
+
+                if chunk_pos_ not in tile_map["map"]:
+                    tile_map["map"][chunk_pos_] = {}
+
+                if pos_ not in tile_map["map"][chunk_pos_]:
+                    tile_map["map"][chunk_pos_][pos_] = {}
+
+                if pos_ in tile_map["map"][chunk_pos_] and layer_ in tile_map["map"][chunk_pos_][pos_]:
+                    old_tile = tile_map["map"][chunk_pos_][pos_][layer_][-1]
+
+                tile_map["map"][chunk_pos_][pos_][layer_] = [selection_]
+
+                if specific_tile is None and [pos_, layer_, "replace", selection, old_tile] not in undo_list and [pos_, layer_, "remove", selection_] not in undo_list:
+                    if not old_tile == selection_:  # Skips all tiles that are the same as selection
+
+                        if old_tile is not None:
+                            undo_list.append([pos_, layer_, "replace", selection, old_tile])
+                        else:
+                            undo_list.append([pos_, layer_, "remove", selection_])
+
+                tile_map["map"][chunk_pos_][pos_] = {key_: val for key_, val in sorted(tile_map["map"][chunk_pos_][pos_].items(), key=lambda ele: int(ele[0]))}
+
+                for i_ in tile_map["map"][chunk_pos_][pos_]:
+
+                    if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
+                        screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]),
+                                    (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+
+                    else:
+                        screen.blit((tile_index["null"]),
+                                    (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
 
 
 def erase_tile(_zoom, layer_, offset_, selection_=None, specific_tile=None):
     """Erases tiles and enemies"""
 
-    if mouse_rect.x > sidebar_img.get_width() or specific_tile is not None:
+    if mouse_rect.x > sidebar_img.get_width() or specific_tile is not None or sidebar_hidden:
+        if not mouse_over_gui:
+            erased = False  # If tile wasn't a normal tile, erase an enemy
 
-        erased = False  # If tile wasn't a normal tile, erase an enemy
+            tile_pos_ = [round(((mouse_rect.x - offset_[0]) + round(scroll[0])) / tile_size),
+                         round(((mouse_rect.y - offset_[1]) + round(scroll[1])) / tile_size)]
 
-        tile_pos_ = [round(((mouse_rect.x - offset_[0]) + round(scroll[0])) / tile_size),
-                     round(((mouse_rect.y - offset_[1]) + round(scroll[1])) / tile_size)]
+            chunk_pos_ = str(int((tile_pos_[0]) / 8)) + ";" + str(int((tile_pos_[1]) / 8))
+            pos_ = str(tile_pos_[0]) + ";" + str(tile_pos_[1])
 
-        chunk_pos_ = str(int((tile_pos_[0]) / 8)) + ";" + str(int((tile_pos_[1]) / 8))
-        pos_ = str(tile_pos_[0]) + ";" + str(tile_pos_[1])
+            if specific_tile is not None:
+                pos_ = specific_tile.split(";")
+                pos_[0], pos_[1], = int(pos_[0]), int(pos_[1])
+                tile_pos_ = [pos_[0], pos_[1]]
+                chunk_pos_ = str(int((pos_[0]) / 8)) + ";" + str(int((pos_[1]) / 8))
+                pos_ = specific_tile
 
-        if specific_tile is not None:
+            if chunk_pos_ in tile_map["map"]:
+                if pos_ in tile_map["map"][chunk_pos_]:
+                    if layer_ in tile_map["map"][chunk_pos_][pos_]:
+                        if tile_map["map"][chunk_pos_][pos_][layer_][0] in tile_index:
 
-            pos_ = specific_tile.split(";")
-            pos_[0], pos_[1], = int(pos_[0]), int(pos_[1])
-            tile_pos_ = [pos_[0], pos_[1]]
-            chunk_pos_ = str(int((pos_[0]) / 8)) + ";" + str(int((pos_[1]) / 8))
-            pos_ = specific_tile
+                            background_surface = tile_index[tile_map["map"][chunk_pos_][pos_][layer_][0]].copy()
 
-        if chunk_pos_ in tile_map["map"]:
-            if pos_ in tile_map["map"][chunk_pos_]:
-                if layer_ in tile_map["map"][chunk_pos_][pos_]:
-                    if tile_map["map"][chunk_pos_][pos_][layer_][0] in tile_index:
+                            if specific_tile is None and [pos_, layer_, "add", tile_map["map"][chunk_pos_][pos_][layer_][0]] not in undo_list:
+                                undo_list.append([pos_, layer_, "add", tile_map["map"][chunk_pos_][pos_][layer_][0]])
 
-                        background_surface = tile_index[tile_map["map"][chunk_pos_][pos_][layer_][0]].copy()
-
-                        if specific_tile is None and [pos_, layer_, "add", tile_map["map"][chunk_pos_][pos_][layer_][0]] not in undo_list:
-                            undo_list.append([pos_, layer_, "add", tile_map["map"][chunk_pos_][pos_][layer_][0]])
-
-                    else:
-                        background_surface = tile_index["null"].copy()
-
-                        if specific_tile is None and [pos_, layer_, "add", "null"] not in undo_list:
-                            undo_list.append([pos_, layer_, "add", "null"])
-
-                    background_surface.fill(bg_color)
-                    screen.blit(background_surface, (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-                    tile_map["map"][chunk_pos_][pos_].pop(layer_)
-                    erased = True
-
-                    for i_ in tile_map["map"][chunk_pos_][pos_]:
-
-                        if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
-                            screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]), (int(tile_pos_[0] * tile_size) - scroll[0],
-                                                                                                 int(tile_pos_[1] * tile_size) - scroll[1]))
                         else:
-                            screen.blit((tile_index["null"]), (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+                            background_surface = tile_index["null"].copy()
+
+                            if specific_tile is None and [pos_, layer_, "add", "null"] not in undo_list:
+                                undo_list.append([pos_, layer_, "add", "null"])
+
+                        background_surface.fill(bg_color)
+                        screen.blit(background_surface, (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+                        tile_map["map"][chunk_pos_][pos_].pop(layer_)
+                        erased = True
+
+                        for i_ in tile_map["map"][chunk_pos_][pos_]:
+
+                            if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
+                                screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]), (int(tile_pos_[0] * tile_size) - scroll[0],
+                                                                                                     int(tile_pos_[1] * tile_size) - scroll[1]))
+                            else:
+                                screen.blit((tile_index["null"]), (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+
+                        if chunk_pos_ in tile_map["mobs"]:
+                            if pos_ in tile_map["mobs"][chunk_pos_]:
+
+                                for i_ in tile_map["mobs"][chunk_pos_][pos_]:
+                                    screen.blit((tile_index[tile_map["mobs"][chunk_pos_][pos_][i_][0]]),
+                                                (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+
+                    if chunk_pos_ in tile_map["map"]:
+                        if pos_ in tile_map["map"][chunk_pos_]:
+
+                            if not tile_map["map"][chunk_pos_][pos_]:
+                                tile_map["map"][chunk_pos_].pop(pos_)
+
+                        if not tile_map["map"][chunk_pos_]:
+                            tile_map["map"].pop(chunk_pos_)
+
+            if selection_:  # To remove pycharm "unused variable" error :p
+                pass
+
+            if chunk_pos_ in tile_map["mobs"] and erased is False:
+                if pos_ in tile_map["mobs"][chunk_pos_]:
+                    if layer_ in tile_map["mobs"][chunk_pos_][pos_]:
+                        if tile_map["mobs"][chunk_pos_][pos_][layer_][0] in tile_index:
+
+                            background_surface = tile_index[tile_map["mobs"][chunk_pos_][pos_][layer_][0]].copy()
+
+                            if specific_tile is None and [pos_, layer_, "add", tile_map["mobs"][chunk_pos_][pos_][layer_][0]] not in undo_list:
+                                undo_list.append([pos_, layer_, "add", tile_map["mobs"][chunk_pos_][pos_][layer_][0]])
+
+                        else:
+                            background_surface = tile_index["null"].copy()
+
+                            if specific_tile is None and [pos_, layer_, "add", "null"] not in undo_list:
+                                undo_list.append([pos_, layer_, "add", "null"])
+
+                        background_surface.fill(bg_color)
+                        screen.blit(background_surface, (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+                        tile_map["mobs"][chunk_pos_][pos_].pop(layer_)
+
+                        for i_ in tile_map["mobs"][chunk_pos_][pos_]:
+                            screen.blit((tile_index[tile_map["mobs"][chunk_pos_][pos_][i_][0]]),
+                                        (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size)
+                                         - scroll[1]))
+                        if chunk_pos_ in tile_map["map"]:
+                            if pos_ in tile_map["map"][chunk_pos_]:
+                                for i_ in tile_map["map"][chunk_pos_][pos_]:
+
+                                    if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
+                                        screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]),
+                                                    (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+
+                                    else:
+                                        screen.blit((tile_index["null"]), (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
 
                     if chunk_pos_ in tile_map["mobs"]:
                         if pos_ in tile_map["mobs"][chunk_pos_]:
 
-                            for i_ in tile_map["mobs"][chunk_pos_][pos_]:
-                                screen.blit((tile_index[tile_map["mobs"][chunk_pos_][pos_][i_][0]]),
-                                            (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+                            if not tile_map["mobs"][chunk_pos_][pos_]:
+                                tile_map["mobs"][chunk_pos_].pop(pos_)
 
-                if chunk_pos_ in tile_map["map"]:
-                    if pos_ in tile_map["map"][chunk_pos_]:
-
-                        if not tile_map["map"][chunk_pos_][pos_]:
-                            tile_map["map"][chunk_pos_].pop(pos_)
-
-                    if not tile_map["map"][chunk_pos_]:
-                        tile_map["map"].pop(chunk_pos_)
-
-        if selection_:  # To remove pycharm "unused variable" error :p
-            pass
-
-        if chunk_pos_ in tile_map["mobs"] and erased is False:
-            if pos_ in tile_map["mobs"][chunk_pos_]:
-                if layer_ in tile_map["mobs"][chunk_pos_][pos_]:
-                    if tile_map["mobs"][chunk_pos_][pos_][layer_][0] in tile_index:
-
-                        background_surface = tile_index[tile_map["mobs"][chunk_pos_][pos_][layer_][0]].copy()
-
-                        if specific_tile is None and [pos_, layer_, "add", tile_map["mobs"][chunk_pos_][pos_][layer_][0]] not in undo_list:
-                            undo_list.append([pos_, layer_, "add", tile_map["mobs"][chunk_pos_][pos_][layer_][0]])
-
-                    else:
-                        background_surface = tile_index["null"].copy()
-
-                        if specific_tile is None and [pos_, layer_, "add", "null"] not in undo_list:
-                            undo_list.append([pos_, layer_, "add", "null"])
-
-                    background_surface.fill(bg_color)
-                    screen.blit(background_surface, (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-                    tile_map["mobs"][chunk_pos_][pos_].pop(layer_)
-
-                    for i_ in tile_map["mobs"][chunk_pos_][pos_]:
-                        screen.blit((tile_index[tile_map["mobs"][chunk_pos_][pos_][i_][0]]), (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size)
-                                                                                              - scroll[1]))
-                    if chunk_pos_ in tile_map["map"]:
-                        if pos_ in tile_map["map"][chunk_pos_]:
-                            for i_ in tile_map["map"][chunk_pos_][pos_]:
-
-                                if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
-                                    screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]),
-                                                (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-
-                                else:
-                                    screen.blit((tile_index["null"]), (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-
-                if chunk_pos_ in tile_map["mobs"]:
-                    if pos_ in tile_map["mobs"][chunk_pos_]:
-
-                        if not tile_map["mobs"][chunk_pos_][pos_]:
-                            tile_map["mobs"][chunk_pos_].pop(pos_)
-
-                    if not tile_map["mobs"][chunk_pos_]:
-                        tile_map["mobs"].pop(chunk_pos_)
+                        if not tile_map["mobs"][chunk_pos_]:
+                            tile_map["mobs"].pop(chunk_pos_)
 
 
 def scale_tiles(t_index, tile_index_copy, operator=""):
@@ -705,17 +713,17 @@ def scale_tiles(t_index, tile_index_copy, operator=""):
     if operator == "*":
         for key_ in tile_index_copy:
             img = tile_index_copy[key_]
-            t_index[key_] = pygame.transform.scale(img, (img.get_width() * zoom, img.get_height() * zoom))
+            t_index[key_] = pg.transform.scale(img, (img.get_width() * zoom, img.get_height() * zoom))
 
     elif operator == "/":
         for key_ in tile_index_copy:
             img = tile_index_copy[key_]
-            t_index[key_] = pygame.transform.scale(img, (round(img.get_width() / abs(zoom)), round(img.get_height() / abs(zoom))))
+            t_index[key_] = pg.transform.scale(img, (round(img.get_width() / abs(zoom)), round(img.get_height() / abs(zoom))))
 
     else:
         for key_ in tile_index_copy:
             img = tile_index_copy[key_]
-            t_index[key_] = pygame.transform.scale(img, (img.get_width(), img.get_height()))
+            t_index[key_] = pg.transform.scale(img, (img.get_width(), img.get_height()))
 
     return t_index, tile_index_copy
 
@@ -728,24 +736,24 @@ while running:
     # Menu -------------------------------------------------------------------------------------------------------------------------------------------------------------
     if state == "menu":
 
-        left_mouse_button = False
+        left_mouse_btn_down = False
         screen.blit(background_img, (0, 0))
 
-        mouse = pygame.mouse.get_pos()
+        mouse = pg.mouse.get_pos()
 
         # Events
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
                 running = False
 
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                left_mouse_button = True
+            if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                left_mouse_btn_down = True
 
         # Blits buttons
-        load_map_button.update(left_mouse_button)
-        new_map_button.update(left_mouse_button)
-        settings_button.update(left_mouse_button)
-        exit_button.update(left_mouse_button)
+        load_map_button.update(left_mouse_btn_down)
+        new_map_button.update(left_mouse_btn_down)
+        settings_button.update(left_mouse_btn_down)
+        exit_button.update(left_mouse_btn_down)
 
         if load_map_button.clicked:
             tile_map, map_file_path, error, state, layer_dict = load_map(layer_dictionary=layer_dict)  # Load map
@@ -764,7 +772,7 @@ while running:
                 file.close()
 
                 for i in tile_map["all_layers"]:
-                    layer_dict[i] = pygame.Surface(WINDOW_SIZE)
+                    layer_dict[i] = pg.Surface(WINDOW_SIZE)
                     layer_dict[i].set_colorkey(bg_color)
 
                 state = "editor"
@@ -791,24 +799,24 @@ while running:
 
     elif state == "settings":
 
-        left_mouse_button = False
+        left_mouse_btn_down = False
         screen.fill((70, 135, 143))
         jumbo_purple_font.render("SETTINGS", screen, (screen.get_width() / 2 - jumbo_purple_font.width("SETTINGS") / 2, 27))
-        mouse = pygame.mouse.get_pos()
+        mouse = pg.mouse.get_pos()
 
         # Events
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
                 running = False
 
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                left_mouse_button = True
+            if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                left_mouse_btn_down = True
 
         # Button updates
-        back_button.update(left_mouse_button)
-        tiles_path_button.update(left_mouse_button)
-        spritesheets_path_button.update(left_mouse_button)
-        maps_path_button.update(left_mouse_button)
+        back_button.update(left_mouse_btn_down)
+        tiles_path_button.update(left_mouse_btn_down)
+        spritesheets_path_button.update(left_mouse_btn_down)
+        maps_path_button.update(left_mouse_btn_down)
 
         # Button logic
         if back_button.clicked:
@@ -819,7 +827,6 @@ while running:
 
             p = askdirectory()
             if not p == "":
-
                 settings["tiles_path"] = p
                 file = open('data/settings.json', 'w')
                 json.dump(settings, file, indent=0)
@@ -841,7 +848,6 @@ while running:
 
             p = askdirectory()
             if not p == "":
-
                 settings["spritesheets_path"] = p
                 file = open('data/settings.json', 'w')
                 json.dump(settings, file, indent=0)
@@ -873,28 +879,30 @@ while running:
     # Editor -----------------------------------------------------------------------------------------------------------------------------------------------------------
 
     elif state == "editor":
-        mouse = pygame.mouse.get_pos()
-        left_mouse_button = False
 
-        for event in pygame.event.get():
+        mouse = pg.mouse.get_pos()
+        left_mouse_btn_down = False
+        left_mouse_btn_up = False
+
+        for event in pg.event.get():
 
             # Exits game
-            if event.type == pygame.QUIT or pygame.key.get_pressed()[pygame.K_ESCAPE]:
+            if event.type == pg.QUIT or pg.key.get_pressed()[pg.K_ESCAPE]:
                 save_map()
                 running = False
 
-            if event.type == pygame.KEYDOWN:
+            if event.type == pg.KEYDOWN:
 
-                if event.key == pygame.K_u:
+                if event.key == pg.K_u:
                     update = True
 
                 # Resets scroll
-                if event.key == pygame.K_SPACE:
+                if event.key == pg.K_SPACE:
                     scroll = [0, 0]
                     update = True
 
                 # Moves screen to the left
-                if event.key == pygame.K_LEFT:
+                if event.key == pg.K_LEFT:
                     old_scroll = scroll.copy()
                     old_mouse_rect = mouse_rect.copy()
                     scroll[0] -= 2
@@ -904,7 +912,7 @@ while running:
                     pixels_scrolled[0] += -2
 
                 # Moves screen to the right
-                elif event.key == pygame.K_RIGHT:
+                elif event.key == pg.K_RIGHT:
                     old_scroll = scroll.copy()
                     old_mouse_rect = mouse_rect.copy()
                     scroll[0] -= -2
@@ -914,7 +922,7 @@ while running:
                     pixels_scrolled[0] += 2
 
                 # Moves screen up
-                if event.key == pygame.K_UP:
+                if event.key == pg.K_UP:
                     old_scroll = scroll.copy()
                     old_mouse_rect = mouse_rect.copy()
                     scroll[1] -= 2
@@ -924,7 +932,7 @@ while running:
                     pixels_scrolled[1] += -2
 
                 # Moves screen down
-                elif event.key == pygame.K_DOWN:
+                elif event.key == pg.K_DOWN:
                     old_scroll = scroll.copy()
                     old_mouse_rect = mouse_rect.copy()
                     scroll[1] -= -2
@@ -933,20 +941,21 @@ while running:
                     screen.blit(screen_copy, (0, -2))
                     pixels_scrolled[1] += 2
 
-                elif event.key == pygame.K_i:
+                elif event.key == pg.K_i:
                     screen.fill(bg_color)
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.type == pg.MOUSEBUTTONDOWN:
 
                 mouse_rect.x, mouse_rect.y = mouse[0], mouse[1]
 
                 if event.button == 1:
-                    left_mouse_button = True
+                    left_mouse_btn_down = True
 
                     # Tile selection
-                    for key in rect_image_dict[tab].keys():
-                        if rect_image_dict[tab][key].collidepoint(mouse):
-                            selection = key
+                    if not sidebar_hidden:
+                        for key in rect_image_dict[tab].keys():
+                            if rect_image_dict[tab][key].collidepoint(mouse):
+                                selection = key
 
                 tile_position = [round(((mouse[0] - offset[0]) + round(scroll[0]))), round(((mouse[1] - offset[1]) + round(scroll[1])))]
 
@@ -973,7 +982,7 @@ while running:
                             if zoom > 0:
                                 tile_size = 32 * zoom
                                 tile_index, ui_images = scale_tiles(tile_index, ui_images, "*")
-                                player_img = pygame.transform.scale(orig_player_img, (orig_player_img.get_width() * zoom, orig_player_img.get_height() * zoom))
+                                player_img = pg.transform.scale(orig_player_img, (orig_player_img.get_width() * zoom, orig_player_img.get_height() * zoom))
 
                                 scroll = [((tile_position[0] * 2) - 928 - zoom_mouse_offset[0]),
                                           ((tile_position[1] * 2) - 496 - zoom_mouse_offset[1])]
@@ -985,8 +994,8 @@ while running:
                             elif zoom < 0:
                                 tile_size = 32 / abs(zoom)
                                 tile_index, ui_images = scale_tiles(tile_index, ui_images, "/")
-                                player_img = pygame.transform.scale(orig_player_img, (round(orig_player_img.get_width() / abs(zoom)), round(orig_player_img.get_height()
-                                                                                                                                            / abs(zoom))))
+                                player_img = pg.transform.scale(orig_player_img, (round(orig_player_img.get_width() / abs(zoom)), round(orig_player_img.get_height()
+                                                                                                                                        / abs(zoom))))
                                 scroll = [((tile_position[0] * 2) - 952) - zoom_mouse_offset[0],
                                           ((tile_position[1] * 2) - 520) - zoom_mouse_offset[1]]
 
@@ -1008,7 +1017,7 @@ while running:
                             if zoom > 0:
                                 tile_size = 32 * zoom
                                 tile_index, ui_images = scale_tiles(tile_index, ui_images, "*")
-                                player_img = pygame.transform.scale(orig_player_img, (orig_player_img.get_width() * zoom, orig_player_img.get_height() * zoom))
+                                player_img = pg.transform.scale(orig_player_img, (orig_player_img.get_width() * zoom, orig_player_img.get_height() * zoom))
 
                                 scroll = [((tile_position[0] / 2) - 928 - zoom_mouse_offset[0]),
                                           ((tile_position[1] / 2) - 496 - zoom_mouse_offset[1])]
@@ -1016,8 +1025,8 @@ while running:
                             elif zoom < 0:
                                 tile_size = 32 / abs(zoom)
                                 tile_index, ui_images = scale_tiles(tile_index, ui_images, "/")
-                                player_img = pygame.transform.scale(orig_player_img, (round(orig_player_img.get_width() / abs(zoom)), round(orig_player_img.get_height()
-                                                                                                                                            / abs(zoom))))
+                                player_img = pg.transform.scale(orig_player_img, (round(orig_player_img.get_width() / abs(zoom)), round(orig_player_img.get_height()
+                                                                                                                                        / abs(zoom))))
                                 scroll = [((tile_position[0] / 2) - 952 - zoom_mouse_offset[0]),
                                           ((tile_position[1] / 2) - 520 - zoom_mouse_offset[1])]
 
@@ -1034,13 +1043,16 @@ while running:
                                           ((tile_position[1] / 2) - 512 - zoom_mouse_offset[1])]
                             update = True
 
-            if event.type == pygame.MOUSEBUTTONUP:
+            if event.type == pg.MOUSEBUTTONUP:
                 update = True
 
-            # Scroll
-            if pygame.mouse.get_pressed(3)[1]:
+                if event.button == 1:
+                    left_mouse_btn_up = True
 
-                if not old_pressed == pygame.mouse.get_pressed(3)[1]:
+            # Scroll
+            if pg.mouse.get_pressed(3)[1]:
+
+                if not old_pressed == pg.mouse.get_pressed(3)[1]:
                     mouse_rect.x, mouse_rect.y = mouse[0], mouse[1]
 
                 old_scroll = scroll.copy()
@@ -1054,7 +1066,7 @@ while running:
                 pixels_scrolled[0] += scroll[0] - old_scroll[0]
                 pixels_scrolled[1] += scroll[1] - old_scroll[1]
 
-            old_pressed = pygame.mouse.get_pressed(3)[1]
+            old_pressed = pg.mouse.get_pressed(3)[1]
 
             # Offset used for blitting tiles in a grid
             if zoom < 0:
@@ -1211,7 +1223,7 @@ while running:
         current_time = time.time()
         last_holding_down = holding_down
 
-        if pygame.key.get_pressed()[pygame.K_z] and pygame.key.get_pressed()[pygame.K_LCTRL] and pygame.key.get_pressed()[pygame.K_LSHIFT]:
+        if pg.key.get_pressed()[pg.K_z] and pg.key.get_pressed()[pg.K_LCTRL] and pg.key.get_pressed()[pg.K_LSHIFT]:
             holding_down = True
 
             if not last_holding_down:
@@ -1229,7 +1241,6 @@ while running:
                         last_time = current_time
 
                     if len(redo_list) > 0:
-                        update = True
                         pos = redo_list[-1][0].split(";")
                         pos[0], pos[1], = int(pos[0]), int(pos[1])
 
@@ -1249,8 +1260,11 @@ while running:
                             undo_list.append(redo_list[-1])
                             redo_list.pop()
 
+                        if len(redo_list) == 0:
+                            update = True
+
         # Undo / redo
-        elif pygame.key.get_pressed()[pygame.K_z] and pygame.key.get_pressed()[pygame.K_LCTRL]:
+        elif pg.key.get_pressed()[pg.K_z] and pg.key.get_pressed()[pg.K_LCTRL]:
             holding_down = True
 
             if not last_holding_down:
@@ -1268,7 +1282,6 @@ while running:
                         last_time = current_time
 
                     if len(undo_list) > 0:
-                        update = True
                         pos = undo_list[-1][0].split(";")
                         pos[0], pos[1], = int(pos[0]), int(pos[1])
 
@@ -1287,17 +1300,20 @@ while running:
                             redo_list.append(undo_list[-1])
                             undo_list.pop()
 
+                        if len(undo_list) == 0:
+                            update = True
+
         else:
             undo_redo_flag = False
             holding_down = False
 
         # Draw tiles
-        if pygame.mouse.get_pressed(3)[0]:
+        if pg.mouse.get_pressed(3)[0]:
             if selection is not None:
                 calculate_line(mouse_rect.x, mouse_rect.y, mouse[0], mouse[1], draw_tile, zoom, current_layer, offset, selection)
 
         # Erases tiles
-        elif pygame.mouse.get_pressed(3)[2]:
+        elif pg.mouse.get_pressed(3)[2]:
             calculate_line(mouse_rect.x, mouse_rect.y, mouse[0], mouse[1], erase_tile, zoom, current_layer, offset, selection)
 
         # Blitting -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1306,7 +1322,7 @@ while running:
             for i in layer_dict.keys():
                 layer_dict[i].fill(bg_color)
 
-            layer_dict["0"].blit(player_img, (int(16 * tile_size) - scroll[0], int(15 * tile_size) - scroll[1]))
+            screen.blit(player_img, (int(16 * tile_size) - scroll[0], int(15 * tile_size) - scroll[1]))
 
             if zoom < 0:
                 tile_range = [round(5 * abs(zoom)), 9 * abs(zoom)]
@@ -1325,7 +1341,7 @@ while running:
                         for tile in tile_map["map"][target_chunk]:
                             for layer in tile_map["map"][target_chunk][tile]:
                                 if layer not in layer_dict:
-                                    layer_dict[layer] = pygame.Surface(WINDOW_SIZE)
+                                    layer_dict[layer] = pg.Surface(WINDOW_SIZE)
                                     layer_dict[layer].set_colorkey(bg_color)
                                     layer_dict[layer].fill(bg_color)
                                     layer_dict = {key: val for key, val in sorted(layer_dict.items(), key=lambda ele: int(ele[0]))}
@@ -1346,7 +1362,7 @@ while running:
                             for layer in tile_map["mobs"][target_chunk][tile]:
 
                                 if layer not in layer_dict:
-                                    layer_dict[layer] = pygame.Surface(WINDOW_SIZE)
+                                    layer_dict[layer] = pg.Surface(WINDOW_SIZE)
                                     layer_dict[layer].set_colorkey(bg_color)
                                     layer_dict[layer].fill(bg_color)
                                     layer_dict = {key: val for key, val in sorted(layer_dict.items(), key=lambda ele: int(ele[0]))}
@@ -1366,21 +1382,21 @@ while running:
 
             update = False
 
+        screen.blit(player_img, (int(16 * tile_size) - scroll[0], int(15 * tile_size) - scroll[1]))
         display.blit(screen, (0, 0))
 
-        # Blits mouse position text
         tile_position = [round(((mouse[0] - offset[0]) + round(scroll[0])) / tile_size), round(((mouse[1] - offset[1]) + round(scroll[1])) / tile_size)]
         chunk_pos = str(int((tile_position[0]) / 8)) + ":" + str(int((tile_position[1]) / 8))
         chunk_pos = chunk_pos.replace(":", ";")
 
         # Blits mouse tile
-        if not pygame.mouse.get_pressed(3)[2]:
-            if mouse[0] > sidebar_img.get_width():
+        if not pg.mouse.get_pressed(3)[2]:
+            if mouse[0] > sidebar_img.get_width() or sidebar_hidden:
                 mouse_scroll = [scroll[0] % tile_size, scroll[1] % tile_size]
 
                 if selection in tile_index:
                     blitted_selection = tile_index[selection].copy()
-                    tinted_selection = pygame.Surface((blitted_selection.get_width(), blitted_selection.get_height()))
+                    tinted_selection = pg.Surface((blitted_selection.get_width(), blitted_selection.get_height()))
                     tinted_selection.fill((0, 0, 0))
                     tinted_selection.set_alpha(30)
                     blitted_selection.set_alpha(180)
@@ -1390,7 +1406,6 @@ while running:
                         if pos in tile_map["map"][chunk_pos]:
                             for layer in tile_map["map"][chunk_pos][pos]:
                                 if tile_map["map"][chunk_pos][pos][layer][0] == selection:
-
                                     blitted_selection.set_alpha(255)
                                     tinted_selection.set_alpha(0)
                                     break
@@ -1402,7 +1417,6 @@ while running:
                         if pos in tile_map["map"][chunk_pos]:
                             for layer in tile_map["map"][chunk_pos][pos]:
                                 if layer > current_layer and mouse_tile_flag:
-
                                     display.blit(blitted_selection, (round(((mouse[0] - offset[0]) + mouse_scroll[0]) / tile_size) * tile_size - mouse_scroll[0],
                                                                      round(((mouse[1] - offset[1]) + mouse_scroll[1]) / tile_size) * tile_size - mouse_scroll[1]))
                                     mouse_tile_flag = False
@@ -1423,57 +1437,86 @@ while running:
                         display.blit(tile_index["null"], (round(((mouse[0] - offset[0]) + mouse_scroll[0]) / tile_size) * tile_size - mouse_scroll[0],
                                                           round(((mouse[1] - offset[1]) + mouse_scroll[1]) / tile_size) * tile_size - mouse_scroll[1]))
 
-        # display.blit(sidebar_img, (0, 0))  # Blits sidebar image
+        if not sidebar_hidden:
+            display.blit(sidebar_img, (0, 0))
+
         chunk_pos = chunk_pos.replace(";", ":")
         white_font.render("Chunk: " + chunk_pos + "   Tile: " + str(tile_position[0]) + ":" + str(tile_position[1]), display, (420, 2))
-        dark_purple_font.render("Layer: " + str(current_layer), display, (46, 197))
+
+        if not sidebar_hidden:
+            dark_purple_font.render("Layer: " + str(current_layer), display, (46, 197))
+
         right_arrow_button.position[0] = 47 + (dark_purple_font.width("Layer: " + str(current_layer)))
         display.blit(tiny_mouse_dot_img, mouse_rect)
 
         # Displays sidebar images
-        for key in rect_image_dict[tab].keys():
-            if key in ui_images:
+        if not sidebar_hidden:
+            for key in rect_image_dict[tab].keys():
+                if key in ui_images:
 
-                if not rect_image_dict[tab][key].collidepoint(mouse):
-                    display.blit(ui_images[key], rect_image_dict[tab][key])
+                    if not rect_image_dict[tab][key].collidepoint(mouse):
+                        display.blit(ui_images[key], rect_image_dict[tab][key])
+
+                    else:
+                        display.blit(ui_images[key], (rect_image_dict[tab][key].x, rect_image_dict[tab][key].y - 5))
 
                 else:
-                    display.blit(ui_images[key], (rect_image_dict[tab][key].x, rect_image_dict[tab][key].y - 5))
-
-            else:
-                display.blit(ui_images["null"], rect_image_dict[tab][key])
+                    display.blit(ui_images["null"], rect_image_dict[tab][key])
 
         # BUTTONS ------------------------------------------------------------------------------------------------------------------------------------------------------
 
-        for button in editor_button_list:
-            button.update(left_mouse_button)
+        mouse_over_gui = False
+        if not sidebar_hidden:
+            try:
+                if sidebar_arrow_mask.get_at((mouse[0] - 410, mouse[1])):
+                    mouse_over_gui = True
+                    display.blit(sidebar_arrow_img2, (410, 0))
+                    if left_mouse_btn_up:
+                        sidebar_hidden = True
+            except IndexError:
+                pass
 
-        if tiles_button.clicked:
-            tab = "tiles"
+        elif sidebar_hidden:
+            display.blit(sidebar_arrow_img, (0, 0))
+            try:
+                if sidebar_arrow_mask.get_at((mouse[0], mouse[1])):
+                    mouse_over_gui = True
+                    display.blit(sidebar_arrow_img2, (0, 0))
+                    if left_mouse_btn_up:
+                        sidebar_hidden = False
+            except IndexError:
+                pass
 
-        if decorations_button.clicked:
-            tab = "decorations"
+        if not sidebar_hidden:
+            for button in editor_button_list:
+                button.update(left_mouse_btn_down)
 
-        if mobs_button.clicked:
-            tab = "mobs"
+            if tiles_button.clicked:
+                tab = "tiles"
 
-        if editor_load_map_button.clicked:
-            save_map()
-            tile_map, map_file_path, error, _, layer_dict = load_map(tile_map, map_file_path, layer_dict)
-            update = True
+            if decorations_button.clicked:
+                tab = "decorations"
 
-        if editor_load_image_button.clicked:
-            rect_image_dict, tile_index, ui_images = load_image(rect_image_dict, "//data/map editor/saved images/", tile_index, ui_images)
+            if mobs_button.clicked:
+                tab = "mobs"
 
-        if left_arrow_button.clicked:
-            current_layer = str(int(current_layer) - 1)
+            if editor_load_map_button.clicked:
+                save_map()
+                tile_map, map_file_path, error, _, layer_dict = load_map(tile_map, map_file_path, layer_dict)
+                update = True
 
-        if right_arrow_button.clicked:
-            current_layer = str(int(current_layer) + 1)
+            if editor_load_image_button.clicked:
+                rect_image_dict, tile_index, ui_images = load_image(rect_image_dict, "//data/map editor/saved images/", tile_index, ui_images)
 
-        if editor_settings_button.clicked:
-            state = "settings"
-            last_state = "editor"
+            if left_arrow_button.clicked:
+                current_layer = str(int(current_layer) - 1)
+
+            if right_arrow_button.clicked:
+                current_layer = str(int(current_layer) + 1)
+
+            if editor_settings_button.clicked:
+                state = "settings"
+                last_state = "editor"
 
     clock.tick(1000)
-    pygame.display.update()
+    pg.display.update()
