@@ -1,3 +1,4 @@
+import copy
 import pygame as pg
 import os
 from shutil import copyfile
@@ -50,7 +51,400 @@ tile_index = {"null": null_img}
 rect_image_dict = {"tiles": {}, "decorations": {}, "mobs": {}}  # Used for tabs inside of editor
 
 
-def create_sidebar_image(rect_image_dict_, new_tile_index, image, name, gap):
+def load_image(rect_image_dict_, path, tile_index_, ui_images_):
+    """ Loads an image"""
+    file_path = askopenfilename()
+    basename = os.path.basename(file_path)
+    name = basename.split(".")[0]
+
+    if not file_path:
+        return rect_image_dict_, tile_index_, ui_images_
+
+    copyfile(file_path, path + str(basename))
+    gap = 5
+    image = pg.image.load(file_path).convert()
+    image.set_colorkey(img_colorkey)
+    image = pg.transform.scale(image, (image.get_width() * 2, image.get_height() * 2))
+    image_rect = image.get_rect()
+
+    if name[0:5] == "enemy":
+        tab_ = "mobs"
+
+    elif image_rect.width == 32 and image_rect.height == 32:
+        tab_ = "tiles"
+
+    else:
+        tab_ = "decorations"
+
+    if len(rect_image_dict_[tab_]) > 0:
+
+        if list(rect_image_dict_[tab_].values())[-1].y + (list(rect_image_dict_[tab_].values())[-1].height * 2) + gap > 1011:
+            image_rect.x, image_rect.y, = (list(rect_image_dict_[tab_].values())[-1].x + image_rect.width + gap), 323
+
+        else:
+            image_rect.x, image_rect.y, = list(rect_image_dict_[tab_].values())[-1].x, (list(rect_image_dict_[tab_].values())[-1].y +
+                                                                                        list(rect_image_dict_[tab_].values())[-1].height) + gap
+    else:
+        image_rect.x, image_rect.y, = (39, 323)
+
+    for rect in rect_image_dict_[tab_].values():
+        if image_rect.colliderect(rect):
+
+            while image_rect.colliderect(rect):
+                image_rect.y += 1
+
+            image_rect.y += gap
+
+    tile_index_[name] = image
+
+    if name in rect_image_dict_[tab_]:
+        image_rect.x, image_rect.y, = rect_image_dict_[tab_][name].x, rect_image_dict_[tab_][name].y
+        rect_image_dict_[tab_].pop(name)
+        rect_image_dict_[tab_][name] = image_rect
+
+    else:
+        rect_image_dict_[tab_][name] = image_rect
+
+    ui_images_ = tile_index_.copy()
+
+    return rect_image_dict_, tile_index_, ui_images_
+
+
+def save_map():
+    """Saves map and adds layers to 'all_layers' by looping through 'map' and 'mobs'"""
+    layer_list = []
+    f = open(map_file_path, "w")
+
+    for chunk_ in tile_map["map"].values():
+        for tile_ in chunk_.values():
+            for layer_ in tile_:
+
+                if layer_ not in layer_list:
+                    layer_list.append(layer_)
+
+    for chunk_ in tile_map["mobs"].values():
+        for tile_ in chunk_.values():
+            for layer_ in tile_:
+
+                if layer_ not in layer_list:
+                    layer_list.append(layer_)
+
+    if "0" not in layer_list:
+        layer_list.append("0")
+
+    tile_map["all_layers"] = layer_list
+    tile_map["all_layers"].sort(key=int)
+    json.dump(tile_map, f)
+    f.close()
+
+
+def load_map(current_map_file_path=None, current_map_file=None, layer_dictionary=None):
+    """Loads map"""
+
+    try:
+        file_name = askopenfilename(initialdir=settings["maps_path"], filetypes=[("jpeg files", "*.json")], defaultextension="*.json")
+        f = open(file_name, 'r')
+        data = json.load(f)
+        if file_name.endswith(".json") and isinstance(data, dict):
+
+            f.close()
+            layer_dict_ = {}
+
+            for i_ in data["all_layers"]:
+                layer_dict_[str(i_)] = pg.Surface(WINDOW_SIZE)
+                layer_dict_[str(i_)].set_colorkey(bg_color)
+
+            return data, file_name, None, "editor", layer_dict_  # Returns stuff, except for the error, which is returned to None
+
+        else:
+            f.close()
+            return tile_map, current_map_file, "Load failed!", "menu", layer_dictionary
+
+    except FileNotFoundError:
+        return current_map_file_path, current_map_file, "Load failed!", "menu", layer_dictionary
+
+
+def calculate_line(x1, y1, x2, y2, mouse_rect_, fun):
+    """
+    Calculates a line between last_mouse_position and current_mouse_position and calls a function for each one, used for drawing and erasing tiles.
+    Use a lambda to call fun with arguments.
+    """
+
+    w = x2 - x1
+    h = y2 - y1
+    dx1 = 0
+    dy1 = 0
+    dx2 = 0
+    dy2 = 0
+
+    if w < 0:
+        dx1 = -1
+    elif w > 0:
+        dx1 = 1
+    if h < 0:
+        dy1 = -1
+    elif h > 0:
+        dy1 = 1
+    if w < 0:
+        dx2 = -1
+    elif w > 0:
+        dx2 = 1
+
+    longest = abs(w)
+    shortest = abs(h)
+
+    if not longest > shortest:
+        longest = abs(h)
+        shortest = abs(w)
+
+        if h < 0:
+            dy2 = -1
+        elif h > 0:
+            dy2 = 1
+
+        dx2 = 0
+
+    numerator = longest >> 1
+    _i = 0
+
+    while _i <= longest:
+        mouse_rect_.x, mouse_rect_.y = x1, y1
+
+        fun()  # Calls function to either draw or erase tiles
+
+        numerator += shortest
+
+        if not numerator < longest:
+            numerator -= longest
+            x1 += dx1
+            y1 += dy1
+
+        else:
+            x1 += dx2
+            y1 += dy2
+
+        _i += 1
+
+
+def draw_tile(layer_, offset_, selection_, mouse_rect_, tile_size_, sidebar_img_, sidebar_hidden_, mouse_over_gui_, specific_tile=None):
+    """Draws tiles and enemies"""
+
+    if mouse_rect_.x > sidebar_img_.get_width() - 12 or specific_tile is not None or sidebar_hidden_:
+
+        if not mouse_over_gui_:
+            old_tile = None
+            tile_pos_ = [round(((mouse_rect_.x - offset_[0]) + round(scroll[0])) / tile_size_),
+                         round(((mouse_rect_.y - offset_[1]) + round(scroll[1])) / tile_size_)]
+            chunk_pos_ = str(int((tile_pos_[0]) / 8)) + ";" + str(int((tile_pos_[1]) / 8))
+            pos_ = str(tile_pos_[0]) + ";" + str(tile_pos_[1])
+
+            if specific_tile is not None:
+                pos_ = specific_tile.split(";")
+                pos_[0], pos_[1] = int(pos_[0]), int(pos_[1])
+                tile_pos_ = [pos_[0], pos_[1]]
+                chunk_pos_ = str(int((tile_pos_[0]) / 8)) + ";" + str(int((tile_pos_[1]) / 8))
+                pos_ = str(tile_pos_[0]) + ";" + str(tile_pos_[1])
+
+            if selection_[:5] == "enemy":
+                map_or_mobs_ = "mobs"
+                not_map_or_mobs_ = "map"
+            else:
+                map_or_mobs_ = "map"
+                not_map_or_mobs_ = "mobs"
+
+            if map_or_mobs_ is not None:
+
+                if chunk_pos_ not in tile_map[map_or_mobs_]:
+                    tile_map[map_or_mobs_][chunk_pos_] = {}
+
+                if pos_ not in tile_map[map_or_mobs_][chunk_pos_]:
+                    tile_map[map_or_mobs_][chunk_pos_][pos_] = {}
+
+                if pos_ in tile_map[map_or_mobs_][chunk_pos_] and layer_ in tile_map[map_or_mobs_][chunk_pos_][pos_]:
+                    old_tile = tile_map[map_or_mobs_][chunk_pos_][pos_][layer_][-1]
+
+                tile_map[map_or_mobs_][chunk_pos_][pos_][layer_] = [selection_]
+
+                if chunk_pos_ in tile_map[not_map_or_mobs_]:
+                    if pos_ in tile_map[not_map_or_mobs_][chunk_pos_]:
+                        if layer_ in tile_map[not_map_or_mobs_][chunk_pos_][pos_]:
+                            background_surface = tile_index[tile_map[not_map_or_mobs_][chunk_pos_][pos_][layer_][0]].copy()
+                            background_surface.fill(bg_color)
+                            screen.blit(background_surface, (int(tile_pos_[0] * tile_size_) - scroll[0], int(tile_pos_[1] * tile_size_) - scroll[1]))
+
+                            tile_map[not_map_or_mobs_][chunk_pos_][pos_].pop(layer_)
+
+                if specific_tile is None and [pos_, layer_, "replace", selection_, old_tile] not in undo_list and [pos_, layer_, "remove", selection_] not in undo_list:
+                    if not old_tile == selection_:  # Skips all tiles that are the same as selection
+
+                        if old_tile is not None:
+                            undo_list.append([pos_, layer_, "replace", selection_, old_tile])
+                        else:
+                            undo_list.append([pos_, layer_, "remove", selection_])
+
+                tile_map[map_or_mobs_][chunk_pos_][pos_] = {key_: val for key_, val in sorted(tile_map[map_or_mobs_][chunk_pos_][pos_].items(),
+                                                                                              key=lambda ele: int(ele[0]))}
+
+                screen.blit((tile_index[tile_map[map_or_mobs_][chunk_pos_][pos_][layer_][0]]),
+                            (int(tile_pos_[0] * tile_size_) - scroll[0], int(tile_pos_[1] * tile_size_) - scroll[1]))
+
+                if chunk_pos_ in tile_map["map"] and pos_ in tile_map["map"][chunk_pos_]:
+
+                    for i_ in tile_map["map"][chunk_pos_][pos_]:
+
+                        if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
+                            screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]),
+                                        (int(tile_pos_[0] * tile_size_) - scroll[0], int(tile_pos_[1] * tile_size_) - scroll[1]))
+
+                        else:
+                            screen.blit((tile_index["null"]),
+                                        (int(tile_pos_[0] * tile_size_) - scroll[0], int(tile_pos_[1] * tile_size_) - scroll[1]))
+
+                if chunk_pos_ in tile_map["mobs"] and pos_ in tile_map["mobs"][chunk_pos_]:
+
+                    for i_ in tile_map["mobs"][chunk_pos_][pos_]:
+
+                        if tile_map["mobs"][chunk_pos_][pos_][i_][0] in tile_index:
+                            screen.blit((tile_index[tile_map["mobs"][chunk_pos_][pos_][i_][0]]),
+                                        (int(tile_pos_[0] * tile_size_) - scroll[0], int(tile_pos_[1] * tile_size_) - scroll[1]))
+
+                        else:
+                            screen.blit((tile_index["null"]),
+                                        (int(tile_pos_[0] * tile_size_) - scroll[0], int(tile_pos_[1] * tile_size_) - scroll[1]))
+
+
+def erase_tile(layer_, offset_, mouse_rect_, tile_size_, sidebar_img_, sidebar_hidden_, mouse_over_gui_, specific_tile=None):
+    """Erases tiles and enemies"""
+
+    if mouse_rect_.x > sidebar_img_.get_width() - 12 or specific_tile is not None or sidebar_hidden_:
+        if not mouse_over_gui_:
+            erased = False  # If tile wasn't a normal tile, erase an enemy
+
+            tile_pos_ = [round(((mouse_rect_.x - offset_[0]) + round(scroll[0])) / tile_size_),
+                         round(((mouse_rect_.y - offset_[1]) + round(scroll[1])) / tile_size_)]
+
+            chunk_pos_ = str(int((tile_pos_[0]) / 8)) + ";" + str(int((tile_pos_[1]) / 8))
+            pos_ = str(tile_pos_[0]) + ";" + str(tile_pos_[1])
+            if specific_tile is not None:
+                pos_ = specific_tile.split(";")
+                pos_[0], pos_[1], = int(pos_[0]), int(pos_[1])
+                tile_pos_ = [pos_[0], pos_[1]]
+                chunk_pos_ = str(int((pos_[0]) / 8)) + ";" + str(int((pos_[1]) / 8))
+                pos_ = specific_tile
+
+            if chunk_pos_ in tile_map["map"]:
+                if pos_ in tile_map["map"][chunk_pos_]:
+                    if layer_ in tile_map["map"][chunk_pos_][pos_]:
+                        if tile_map["map"][chunk_pos_][pos_][layer_][0] in tile_index:
+
+                            background_surface = tile_index[tile_map["map"][chunk_pos_][pos_][layer_][0]].copy()
+
+                            if specific_tile is None and [pos_, layer_, "add", tile_map["map"][chunk_pos_][pos_][layer_][0]] not in undo_list:
+                                undo_list.append([pos_, layer_, "add", tile_map["map"][chunk_pos_][pos_][layer_][0]])
+
+                        else:
+                            background_surface = tile_index["null"].copy()
+
+                            if specific_tile is None and [pos_, layer_, "add", "null"] not in undo_list:
+                                undo_list.append([pos_, layer_, "add", "null"])
+
+                        background_surface.fill(bg_color)
+                        screen.blit(background_surface, (int(tile_pos_[0] * tile_size_) - scroll[0], int(tile_pos_[1] * tile_size_) - scroll[1]))
+                        tile_map["map"][chunk_pos_][pos_].pop(layer_)
+                        erased = True
+
+                        for i_ in tile_map["map"][chunk_pos_][pos_]:
+
+                            if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
+                                screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]), (int(tile_pos_[0] * tile_size_) - scroll[0],
+                                                                                                     int(tile_pos_[1] * tile_size_) - scroll[1]))
+                            else:
+                                screen.blit((tile_index["null"]), (int(tile_pos_[0] * tile_size_) - scroll[0], int(tile_pos_[1] * tile_size_) - scroll[1]))
+
+                        if chunk_pos_ in tile_map["mobs"]:
+                            if pos_ in tile_map["mobs"][chunk_pos_]:
+
+                                for i_ in tile_map["mobs"][chunk_pos_][pos_]:
+                                    screen.blit((tile_index[tile_map["mobs"][chunk_pos_][pos_][i_][0]]), (int(tile_pos_[0] * tile_size_) - scroll[0],
+                                                                                                          int(tile_pos_[1] * tile_size_) - scroll[1]))
+
+                    if chunk_pos_ in tile_map["map"]:
+                        if pos_ in tile_map["map"][chunk_pos_]:
+
+                            if not tile_map["map"][chunk_pos_][pos_]:
+                                tile_map["map"][chunk_pos_].pop(pos_)
+
+                        if not tile_map["map"][chunk_pos_]:
+                            tile_map["map"].pop(chunk_pos_)
+
+            if chunk_pos_ in tile_map["mobs"] and erased is False:
+                if pos_ in tile_map["mobs"][chunk_pos_]:
+                    if layer_ in tile_map["mobs"][chunk_pos_][pos_]:
+                        if tile_map["mobs"][chunk_pos_][pos_][layer_][0] in tile_index:
+
+                            background_surface = tile_index[tile_map["mobs"][chunk_pos_][pos_][layer_][0]].copy()
+
+                            if specific_tile is None and [pos_, layer_, "add", tile_map["mobs"][chunk_pos_][pos_][layer_][0]] not in undo_list:
+                                undo_list.append([pos_, layer_, "add", tile_map["mobs"][chunk_pos_][pos_][layer_][0]])
+
+                        else:
+                            background_surface = tile_index["null"].copy()
+
+                            if specific_tile is None and [pos_, layer_, "add", "null"] not in undo_list:
+                                undo_list.append([pos_, layer_, "add", "null"])
+
+                        background_surface.fill(bg_color)
+                        screen.blit(background_surface, (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+                        tile_map["mobs"][chunk_pos_][pos_].pop(layer_)
+
+                        for i_ in tile_map["mobs"][chunk_pos_][pos_]:
+                            screen.blit((tile_index[tile_map["mobs"][chunk_pos_][pos_][i_][0]]),
+                                        (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size)
+                                         - scroll[1]))
+                        if chunk_pos_ in tile_map["map"]:
+                            if pos_ in tile_map["map"][chunk_pos_]:
+                                for i_ in tile_map["map"][chunk_pos_][pos_]:
+
+                                    if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
+                                        screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]),
+                                                    (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+
+                                    else:
+                                        screen.blit((tile_index["null"]), (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
+
+                    if chunk_pos_ in tile_map["mobs"]:
+                        if pos_ in tile_map["mobs"][chunk_pos_]:
+
+                            if not tile_map["mobs"][chunk_pos_][pos_]:
+                                tile_map["mobs"][chunk_pos_].pop(pos_)
+
+                        if not tile_map["mobs"][chunk_pos_]:
+                            tile_map["mobs"].pop(chunk_pos_)
+
+
+def scale_tiles(t_index, tile_index_, operator=None):
+    """Scales every tile image, this is used for zooming the screen in and out, I simply scale every tile image and blit them with certain offset to give the illusion
+    of zooming in/out. operator is a string, either '*' for multiplying tile images by zoom or '/' for dividing tile images by zoom"""
+
+    if operator == "*":
+        for key_ in tile_index_:
+            img = tile_index_[key_]
+            t_index[key_] = pg.transform.scale(img, (img.get_width() * zoom, img.get_height() * zoom))
+
+    elif operator == "/":
+        for key_ in tile_index_:
+            img = tile_index_[key_]
+            t_index[key_] = pg.transform.scale(img, (round(img.get_width() / abs(zoom)), round(img.get_height() / abs(zoom))))
+
+    else:
+        for key_ in tile_index_:
+            img = tile_index_[key_]
+            t_index[key_] = pg.transform.scale(img, (img.get_width(), img.get_height()))
+
+    return t_index, tile_index_
+
+
+def create_sidebar_image(rect_image_dict_, tile_index_, image, name, gap):
     """Loops through images and creates positions for them to be blitted on the sidebar"""
     image_rect = image.get_rect()
     starting_pos = [15, 243]
@@ -67,6 +461,7 @@ def create_sidebar_image(rect_image_dict_, new_tile_index, image, name, gap):
         # If the y position is colliding with the bottom of sidebar, set y position to the top and starts a new row
         if list(rect_image_dict_[tab_].values())[-1].y + (list(rect_image_dict_[tab_].values())[-1].height * 2) + gap > ending_pos:
             image_rect.x, image_rect.y, = (list(rect_image_dict_[tab_].values())[-1].x + image_rect.width + gap), starting_pos[1]
+
         else:
             # Creates the position normally by putting it under whichever image was last
             image_rect.x, image_rect.y, = list(rect_image_dict_[tab_].values())[-1].x, (list(rect_image_dict_[tab_].values())[-1].y +
@@ -80,7 +475,7 @@ def create_sidebar_image(rect_image_dict_, new_tile_index, image, name, gap):
                 image_rect.y += 1
             image_rect.y += gap
 
-    new_tile_index[name] = image
+    tile_index_[name] = image
 
     if name in rect_image_dict_[tab_]:
         image_rect.x, image_rect.y, = rect_image_dict_[tab_][name].x, rect_image_dict_[tab_][name].y
@@ -88,7 +483,7 @@ def create_sidebar_image(rect_image_dict_, new_tile_index, image, name, gap):
         rect_image_dict_[tab_][name] = image_rect
     else:
         rect_image_dict_[tab_][name] = image_rect
-    return rect_image_dict_, new_tile_index, image_rect
+    return rect_image_dict_, tile_index_, image_rect
 
 
 def clip(surf, x_, y_, x_size, y_size):
@@ -100,24 +495,27 @@ def clip(surf, x_, y_, x_size, y_size):
     return image.copy()
 
 
-def load_spritesheet(path, new_tile_index, rect_image_dict_, scale=2):
+def load_spritesheet(path, tile_index_, rect_image_dict_, scale=2):
     """Loads a spritesheet by clipping out areas marked with pink and cyan pixels"""
     row_content = {}
-    new_ui_images = {}
+    ui_images_ = {}
     rows = []
     spritesheet_ = pg.image.load(path).convert()
     spritesheet_.set_colorkey((0, 0, 0))
     name = path.split("/")[-1].split(".")[0]
+
     # looks down and stores the positions of all pink pixels in row variable
     for y_ in range(spritesheet_.get_height()):
         c = spritesheet_.get_at((0, y_))
         c = (c[0], c[1], c[2])
         if c == (255, 0, 255):
             rows.append(y_)
+
     i_ = 0
     for row in rows:
         row_content = {}
         # Looks to the right until it finds a pink pixel
+
         for x_ in range(spritesheet_.get_width()):
             c = spritesheet_.get_at((x_, row))
             c = (c[0], c[1], c[2])
@@ -146,16 +544,16 @@ def load_spritesheet(path, new_tile_index, rect_image_dict_, scale=2):
                 img = pg.transform.scale(img, (img.get_width() * scale, img.get_height() * scale))
                 img.set_colorkey((255, 255, 255))
                 row_content[name + str(i_)] = img
-                rect_image_dict_, new_tile_index, image_rect = create_sidebar_image(rect_image_dict_, new_tile_index, img, name + str(i_), 5)
+                rect_image_dict_, tile_index_, image_rect = create_sidebar_image(rect_image_dict_, tile_index_, img, name + str(i_), 5)
                 i_ += 1
 
         # spritesheet_images[name] = row_content  # Saves each row into its own list
-        new_tile_index.update(row_content)
-        new_ui_images = new_tile_index.copy()
-    return row_content, rect_image_dict_, new_tile_index, new_ui_images
+        tile_index_.update(row_content)
+        ui_images_ = tile_index_.copy()
+    return row_content, rect_image_dict_, tile_index_, ui_images_
 
 
-def load_saved_images(path, rect_image_dict_, new_tile_index, scale=2):
+def load_saved_images(path, rect_image_dict_, tile_index_, scale=2):
     """Loads all images in 'saved images' folder"""
 
     for entry in os.scandir(path):  # Loops through all files in directory
@@ -167,16 +565,16 @@ def load_saved_images(path, rect_image_dict_, new_tile_index, scale=2):
                 if path == settings["spritesheets_path"] + "/":
                     image = pg.image.load(entry.path).convert()
                     image.set_colorkey(img_colorkey)
-                    spritesheet, rect_image_dict_, new_tile_index, new_ui_images = load_spritesheet(path + entry.name, tile_index, rect_image_dict)
+                    spritesheet, rect_image_dict_, tile_index_, ui_images_ = load_spritesheet(path + entry.name, tile_index_, rect_image_dict_)
 
                 else:
                     image = pg.image.load(entry.path).convert()
                     image.set_colorkey(img_colorkey)
                     image = pg.transform.scale(image, (image.get_width() * scale, image.get_height() * scale))
                     name = os.path.splitext(entry.name)[0]
-                    rect_image_dict_, new_tile_index, image_rect = create_sidebar_image(rect_image_dict_, new_tile_index, image, name, 5)
-    new_ui_images = new_tile_index.copy()
-    return rect_image_dict_, new_tile_index, new_ui_images
+                    rect_image_dict_, tile_index_, image_rect = create_sidebar_image(rect_image_dict_, tile_index_, image, name, 5)
+    ui_images_ = tile_index_.copy()
+    return rect_image_dict_, tile_index_, ui_images_
 
 
 if not os.path.isfile("data/settings.json"):
@@ -215,7 +613,6 @@ screen_copy = screen.copy()
 tile_pos = [0, 0]
 tile_range = [34, 60]
 offset = [16, 16]
-left_mouse_btn_down = False
 clock = pg.time.Clock()
 current_layer = "0"
 layer_dict = {}
@@ -342,392 +739,6 @@ editor_settings_button = TextButton(purple_editor_font1, purple_editor_font2, "S
 editor_button_list = (tiles_button, decorations_button, mobs_button, editor_load_map_button, editor_load_image_button, left_arrow_button, right_arrow_button,
                       editor_settings_button)
 
-
-def load_image(rect_image_dict_, path, new_tile_index, ui_images_):
-    """ Loads an image"""
-    file_path = askopenfilename()
-    basename = os.path.basename(file_path)
-    name = basename.split(".")[0]
-
-    if not file_path:
-        return rect_image_dict_, new_tile_index, ui_images_
-
-    copyfile(file_path, path + str(basename))
-    gap = 5
-    image = pg.image.load(file_path).convert()
-    image.set_colorkey(img_colorkey)
-    image = pg.transform.scale(image, (image.get_width() * 2, image.get_height() * 2))
-    image_rect = image.get_rect()
-
-    if name[0:5] == "enemy":
-        tab_ = "mobs"
-
-    elif image_rect.width == 32 and image_rect.height == 32:
-        tab_ = "tiles"
-
-    else:
-        tab_ = "decorations"
-
-    if len(rect_image_dict_[tab_]) > 0:
-
-        if list(rect_image_dict_[tab_].values())[-1].y + (list(rect_image_dict_[tab_].values())[-1].height * 2) + gap > 1011:
-            image_rect.x, image_rect.y, = (list(rect_image_dict_[tab_].values())[-1].x + image_rect.width + gap), 323
-
-        else:
-            image_rect.x, image_rect.y, = list(rect_image_dict_[tab_].values())[-1].x, (list(rect_image_dict_[tab_].values())[-1].y +
-                                                                                        list(rect_image_dict_[tab_].values())[-1].height) + gap
-    else:
-        image_rect.x, image_rect.y, = (39, 323)
-
-    for rect in rect_image_dict_[tab_].values():
-        if image_rect.colliderect(rect):
-
-            while image_rect.colliderect(rect):
-                image_rect.y += 1
-
-            image_rect.y += gap
-
-    new_tile_index[name] = image
-
-    if name in rect_image_dict_[tab_]:
-        image_rect.x, image_rect.y, = rect_image_dict_[tab_][name].x, rect_image_dict_[tab_][name].y
-        rect_image_dict_[tab_].pop(name)
-        rect_image_dict_[tab_][name] = image_rect
-
-    else:
-        rect_image_dict_[tab_][name] = image_rect
-
-    new_ui_images = new_tile_index.copy()
-
-    return rect_image_dict_, new_tile_index, new_ui_images
-
-
-def save_map():
-    """Saves map and adds layers to 'all_layers' by looping through 'map' and 'mobs'"""
-    layer_list = []
-    f = open(map_file_path, "w")
-
-    for chunk_ in tile_map["map"].values():
-        for tile_ in chunk_.values():
-            for layer_ in tile_:
-
-                if layer_ not in layer_list:
-                    layer_list.append(layer_)
-
-    for chunk_ in tile_map["mobs"].values():
-        for tile_ in chunk_.values():
-            for layer_ in tile_:
-
-                if layer_ not in layer_list:
-                    layer_list.append(layer_)
-
-    if "0" not in layer_list:
-        layer_list.append("0")
-
-    tile_map["all_layers"] = layer_list
-    tile_map["all_layers"].sort(key=int)
-    json.dump(tile_map, f)
-    f.close()
-
-
-def load_map(current_map_file_path=None, current_map_file=None, layer_dictionary=None):
-    """Loads map"""
-
-    try:
-        file_name = askopenfilename(initialdir=settings["maps_path"], filetypes=[("jpeg files", "*.json")], defaultextension="*.json")
-        f = open(file_name, 'r')
-        data = json.load(f)
-        if file_name.endswith(".json") and isinstance(data, dict):
-
-            f.close()
-            layer_dict_ = {}
-
-            for i_ in data["all_layers"]:
-                layer_dict_[str(i_)] = pg.Surface(WINDOW_SIZE)
-                layer_dict_[str(i_)].set_colorkey(bg_color)
-
-            return data, file_name, None, "editor", layer_dict_  # Returns stuff, except for the error, which is returned to None
-
-        else:
-            f.close()
-            return tile_map, current_map_file, "Load failed!", "menu", layer_dictionary
-
-    except FileNotFoundError:
-        return current_map_file_path, current_map_file, "Load failed!", "menu", layer_dictionary
-
-
-def calculate_line(x1, y1, x2, y2, fun, _zoom, layer_, offset_, selection_):
-    """Calculates a line between last_mouse_position and current_mouse_position and calls a function for each one, used for drawing and erasing tiles"""
-    w = x2 - x1
-    h = y2 - y1
-    dx1 = 0
-    dy1 = 0
-    dx2 = 0
-    dy2 = 0
-
-    if w < 0:
-        dx1 = -1
-    elif w > 0:
-        dx1 = 1
-    if h < 0:
-        dy1 = -1
-    elif h > 0:
-        dy1 = 1
-    if w < 0:
-        dx2 = -1
-    elif w > 0:
-        dx2 = 1
-
-    longest = abs(w)
-    shortest = abs(h)
-
-    if not longest > shortest:
-        longest = abs(h)
-        shortest = abs(w)
-
-        if h < 0:
-            dy2 = -1
-        elif h > 0:
-            dy2 = 1
-
-        dx2 = 0
-
-    numerator = longest >> 1
-    _i = 0
-
-    while _i <= longest:
-        mouse_rect.x, mouse_rect.y = x1, y1
-
-        if fun is not None:
-            fun(_zoom, layer_, offset_, selection_)  # Calls function to either draw or erase tiles
-
-        numerator += shortest
-
-        if not numerator < longest:
-            numerator -= longest
-            x1 += dx1
-            y1 += dy1
-
-        else:
-            x1 += dx2
-            y1 += dy2
-
-        _i += 1
-
-
-def draw_tile(_zoom, layer_, offset_, selection_, specific_tile=None):
-    """Draws tiles and enemies"""
-
-    if mouse_rect.x > sidebar_img.get_width() or specific_tile is not None or sidebar_hidden:
-        if not mouse_over_gui:
-            old_tile = None
-            tile_pos_ = [round(((mouse_rect.x - offset_[0]) + round(scroll[0])) / tile_size),
-                         round(((mouse_rect.y - offset_[1]) + round(scroll[1])) / tile_size)]
-            chunk_pos_ = str(int((tile_pos_[0]) / 8)) + ";" + str(int((tile_pos_[1]) / 8))
-            pos_ = str(tile_pos_[0]) + ";" + str(tile_pos_[1])
-
-            if specific_tile is not None:
-                pos_ = specific_tile.split(";")
-                pos_[0], pos_[1] = int(pos_[0]), int(pos_[1])
-                tile_pos_ = [pos_[0], pos_[1]]
-                chunk_pos_ = str(int((tile_pos_[0]) / 8)) + ";" + str(int((tile_pos_[1]) / 8))
-                pos_ = str(tile_pos_[0]) + ";" + str(tile_pos_[1])
-
-            if selection_[:5] == "enemy":
-
-                if chunk_pos_ not in tile_map["mobs"]:
-                    tile_map["mobs"][chunk_pos_] = {}
-
-                if pos_ not in tile_map["mobs"][chunk_pos_]:
-                    tile_map["mobs"][chunk_pos_][pos_] = {}
-
-                if pos_ in tile_map["mobs"][chunk_pos_] and layer_ in tile_map["mobs"][chunk_pos_][pos_]:
-                    old_tile = tile_map["mobs"][chunk_pos_][pos_][layer_][-1]
-
-                tile_map["mobs"][chunk_pos_][pos_][layer_] = [selection_]
-
-                if specific_tile is None and [pos_, layer_, "replace", selection, old_tile] not in undo_list and [pos_, layer_, "remove", selection_] not in undo_list:
-                    if not old_tile == selection_:
-                        if old_tile is not None:
-                            undo_list.append([pos_, layer_, "replace", selection, old_tile])
-                        else:
-                            undo_list.append([pos_, layer_, "remove", selection_])
-
-                tile_map["mobs"][chunk_pos_][pos_] = {key_: val for key_, val in sorted(tile_map["mobs"][chunk_pos_][pos_].items(), key=lambda ele: int(ele[0]))}
-
-                for i_ in tile_map["mobs"][chunk_pos_][pos_]:
-                    screen.blit((tile_index[tile_map["mobs"][chunk_pos_][pos_][i_][0]]),
-                                (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-
-            else:
-
-                if chunk_pos_ not in tile_map["map"]:
-                    tile_map["map"][chunk_pos_] = {}
-
-                if pos_ not in tile_map["map"][chunk_pos_]:
-                    tile_map["map"][chunk_pos_][pos_] = {}
-
-                if pos_ in tile_map["map"][chunk_pos_] and layer_ in tile_map["map"][chunk_pos_][pos_]:
-                    old_tile = tile_map["map"][chunk_pos_][pos_][layer_][-1]
-
-                tile_map["map"][chunk_pos_][pos_][layer_] = [selection_]
-
-                if specific_tile is None and [pos_, layer_, "replace", selection, old_tile] not in undo_list and [pos_, layer_, "remove", selection_] not in undo_list:
-                    if not old_tile == selection_:  # Skips all tiles that are the same as selection
-
-                        if old_tile is not None:
-                            undo_list.append([pos_, layer_, "replace", selection, old_tile])
-                        else:
-                            undo_list.append([pos_, layer_, "remove", selection_])
-
-                tile_map["map"][chunk_pos_][pos_] = {key_: val for key_, val in sorted(tile_map["map"][chunk_pos_][pos_].items(), key=lambda ele: int(ele[0]))}
-
-                for i_ in tile_map["map"][chunk_pos_][pos_]:
-
-                    if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
-                        screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]),
-                                    (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-
-                    else:
-                        screen.blit((tile_index["null"]),
-                                    (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-
-
-def erase_tile(_zoom, layer_, offset_, selection_=None, specific_tile=None):
-    """Erases tiles and enemies"""
-
-    if mouse_rect.x > sidebar_img.get_width() or specific_tile is not None or sidebar_hidden:
-        if not mouse_over_gui:
-            erased = False  # If tile wasn't a normal tile, erase an enemy
-
-            tile_pos_ = [round(((mouse_rect.x - offset_[0]) + round(scroll[0])) / tile_size),
-                         round(((mouse_rect.y - offset_[1]) + round(scroll[1])) / tile_size)]
-
-            chunk_pos_ = str(int((tile_pos_[0]) / 8)) + ";" + str(int((tile_pos_[1]) / 8))
-            pos_ = str(tile_pos_[0]) + ";" + str(tile_pos_[1])
-
-            if specific_tile is not None:
-                pos_ = specific_tile.split(";")
-                pos_[0], pos_[1], = int(pos_[0]), int(pos_[1])
-                tile_pos_ = [pos_[0], pos_[1]]
-                chunk_pos_ = str(int((pos_[0]) / 8)) + ";" + str(int((pos_[1]) / 8))
-                pos_ = specific_tile
-
-            if chunk_pos_ in tile_map["map"]:
-                if pos_ in tile_map["map"][chunk_pos_]:
-                    if layer_ in tile_map["map"][chunk_pos_][pos_]:
-                        if tile_map["map"][chunk_pos_][pos_][layer_][0] in tile_index:
-
-                            background_surface = tile_index[tile_map["map"][chunk_pos_][pos_][layer_][0]].copy()
-
-                            if specific_tile is None and [pos_, layer_, "add", tile_map["map"][chunk_pos_][pos_][layer_][0]] not in undo_list:
-                                undo_list.append([pos_, layer_, "add", tile_map["map"][chunk_pos_][pos_][layer_][0]])
-
-                        else:
-                            background_surface = tile_index["null"].copy()
-
-                            if specific_tile is None and [pos_, layer_, "add", "null"] not in undo_list:
-                                undo_list.append([pos_, layer_, "add", "null"])
-
-                        background_surface.fill(bg_color)
-                        screen.blit(background_surface, (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-                        tile_map["map"][chunk_pos_][pos_].pop(layer_)
-                        erased = True
-
-                        for i_ in tile_map["map"][chunk_pos_][pos_]:
-
-                            if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
-                                screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]), (int(tile_pos_[0] * tile_size) - scroll[0],
-                                                                                                     int(tile_pos_[1] * tile_size) - scroll[1]))
-                            else:
-                                screen.blit((tile_index["null"]), (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-
-                        if chunk_pos_ in tile_map["mobs"]:
-                            if pos_ in tile_map["mobs"][chunk_pos_]:
-
-                                for i_ in tile_map["mobs"][chunk_pos_][pos_]:
-                                    screen.blit((tile_index[tile_map["mobs"][chunk_pos_][pos_][i_][0]]),
-                                                (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-
-                    if chunk_pos_ in tile_map["map"]:
-                        if pos_ in tile_map["map"][chunk_pos_]:
-
-                            if not tile_map["map"][chunk_pos_][pos_]:
-                                tile_map["map"][chunk_pos_].pop(pos_)
-
-                        if not tile_map["map"][chunk_pos_]:
-                            tile_map["map"].pop(chunk_pos_)
-
-            if selection_:  # To remove pycharm "unused variable" error :p
-                pass
-
-            if chunk_pos_ in tile_map["mobs"] and erased is False:
-                if pos_ in tile_map["mobs"][chunk_pos_]:
-                    if layer_ in tile_map["mobs"][chunk_pos_][pos_]:
-                        if tile_map["mobs"][chunk_pos_][pos_][layer_][0] in tile_index:
-
-                            background_surface = tile_index[tile_map["mobs"][chunk_pos_][pos_][layer_][0]].copy()
-
-                            if specific_tile is None and [pos_, layer_, "add", tile_map["mobs"][chunk_pos_][pos_][layer_][0]] not in undo_list:
-                                undo_list.append([pos_, layer_, "add", tile_map["mobs"][chunk_pos_][pos_][layer_][0]])
-
-                        else:
-                            background_surface = tile_index["null"].copy()
-
-                            if specific_tile is None and [pos_, layer_, "add", "null"] not in undo_list:
-                                undo_list.append([pos_, layer_, "add", "null"])
-
-                        background_surface.fill(bg_color)
-                        screen.blit(background_surface, (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-                        tile_map["mobs"][chunk_pos_][pos_].pop(layer_)
-
-                        for i_ in tile_map["mobs"][chunk_pos_][pos_]:
-                            screen.blit((tile_index[tile_map["mobs"][chunk_pos_][pos_][i_][0]]),
-                                        (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size)
-                                         - scroll[1]))
-                        if chunk_pos_ in tile_map["map"]:
-                            if pos_ in tile_map["map"][chunk_pos_]:
-                                for i_ in tile_map["map"][chunk_pos_][pos_]:
-
-                                    if tile_map["map"][chunk_pos_][pos_][i_][0] in tile_index:
-                                        screen.blit((tile_index[tile_map["map"][chunk_pos_][pos_][i_][0]]),
-                                                    (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-
-                                    else:
-                                        screen.blit((tile_index["null"]), (int(tile_pos_[0] * tile_size) - scroll[0], int(tile_pos_[1] * tile_size) - scroll[1]))
-
-                    if chunk_pos_ in tile_map["mobs"]:
-                        if pos_ in tile_map["mobs"][chunk_pos_]:
-
-                            if not tile_map["mobs"][chunk_pos_][pos_]:
-                                tile_map["mobs"][chunk_pos_].pop(pos_)
-
-                        if not tile_map["mobs"][chunk_pos_]:
-                            tile_map["mobs"].pop(chunk_pos_)
-
-
-def scale_tiles(t_index, tile_index_copy, operator=""):
-    """Scales every tile image, this is used for zooming the screen in and out, I simply scale every tile image and blit them with certain offset to give the illusion
-    of zooming in/out. operator is a string, either '*' for multiplying tile images by zoom or '/' for dividing tile images by zoom"""
-
-    if operator == "*":
-        for key_ in tile_index_copy:
-            img = tile_index_copy[key_]
-            t_index[key_] = pg.transform.scale(img, (img.get_width() * zoom, img.get_height() * zoom))
-
-    elif operator == "/":
-        for key_ in tile_index_copy:
-            img = tile_index_copy[key_]
-            t_index[key_] = pg.transform.scale(img, (round(img.get_width() / abs(zoom)), round(img.get_height() / abs(zoom))))
-
-    else:
-        for key_ in tile_index_copy:
-            img = tile_index_copy[key_]
-            t_index[key_] = pg.transform.scale(img, (img.get_width(), img.get_height()))
-
-    return t_index, tile_index_copy
-
-
 last_state = "menu"
 state = "menu"
 running = True
@@ -736,7 +747,7 @@ while running:
     # Menu -------------------------------------------------------------------------------------------------------------------------------------------------------------
     if state == "menu":
 
-        left_mouse_btn_down = False
+        left_mouse_btn_up = False
         screen.blit(background_img, (0, 0))
 
         mouse = pg.mouse.get_pos()
@@ -746,14 +757,14 @@ while running:
             if event.type == pg.QUIT:
                 running = False
 
-            if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
-                left_mouse_btn_down = True
+            if event.type == pg.MOUSEBUTTONUP and event.button == 1:
+                left_mouse_btn_up = True
 
         # Blits buttons
-        load_map_button.update(left_mouse_btn_down)
-        new_map_button.update(left_mouse_btn_down)
-        settings_button.update(left_mouse_btn_down)
-        exit_button.update(left_mouse_btn_down)
+        load_map_button.update(left_mouse_btn_up)
+        new_map_button.update(left_mouse_btn_up)
+        settings_button.update(left_mouse_btn_up)
+        exit_button.update(left_mouse_btn_up)
 
         if load_map_button.clicked:
             tile_map, map_file_path, error, state, layer_dict = load_map(layer_dictionary=layer_dict)  # Load map
@@ -799,24 +810,25 @@ while running:
 
     elif state == "settings":
 
-        left_mouse_btn_down = False
+        left_mouse_btn_up = False
         screen.fill((70, 135, 143))
         jumbo_purple_font.render("SETTINGS", screen, (screen.get_width() / 2 - jumbo_purple_font.width("SETTINGS") / 2, 27))
         mouse = pg.mouse.get_pos()
+        mouse_rect.x, mouse_rect.y, = mouse[0], mouse[1]
 
         # Events
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 running = False
 
-            if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
-                left_mouse_btn_down = True
+            if event.type == pg.MOUSEBUTTONUP and event.button == 1:
+                left_mouse_btn_up = True
 
         # Button updates
-        back_button.update(left_mouse_btn_down)
-        tiles_path_button.update(left_mouse_btn_down)
-        spritesheets_path_button.update(left_mouse_btn_down)
-        maps_path_button.update(left_mouse_btn_down)
+        back_button.update(left_mouse_btn_up)
+        tiles_path_button.update(left_mouse_btn_up)
+        spritesheets_path_button.update(left_mouse_btn_up)
+        maps_path_button.update(left_mouse_btn_up)
 
         # Button logic
         if back_button.clicked:
@@ -826,6 +838,7 @@ while running:
         if tiles_path_button.clicked:
 
             p = askdirectory()
+
             if not p == "":
                 settings["tiles_path"] = p
                 file = open('data/settings.json', 'w')
@@ -881,7 +894,6 @@ while running:
     elif state == "editor":
 
         mouse = pg.mouse.get_pos()
-        left_mouse_btn_down = False
         left_mouse_btn_up = False
 
         for event in pg.event.get():
@@ -949,7 +961,6 @@ while running:
                 mouse_rect.x, mouse_rect.y = mouse[0], mouse[1]
 
                 if event.button == 1:
-                    left_mouse_btn_down = True
 
                     # Tile selection
                     if not sidebar_hidden:
@@ -975,7 +986,7 @@ while running:
                 # Zoom
                 if event.button == 4:
 
-                    if mouse[0] > sidebar_img.get_width():
+                    if mouse[0] > sidebar_img.get_width() - 12 and not mouse_over_gui:
                         if zoom < 4:
                             zoom += 2
 
@@ -1010,7 +1021,7 @@ while running:
 
                 # Zoom
                 elif event.button == 5:
-                    if mouse[0] > sidebar_img.get_width():
+                    if mouse[0] > sidebar_img.get_width() - 12 and not mouse_over_gui:
                         if zoom > -4:
                             zoom -= 2
 
@@ -1245,18 +1256,23 @@ while running:
                         pos[0], pos[1], = int(pos[0]), int(pos[1])
 
                         if redo_list[-1][2] == "remove":
-                            draw_tile(zoom, current_layer, offset, selection_=redo_list[-1][3], specific_tile=str(pos[0]) + ";" + str(pos[1]))
+
+                            draw_tile(current_layer, offset, redo_list[-1][3], mouse_rect, tile_size, sidebar_img, sidebar_hidden,
+                                      mouse_over_gui, specific_tile=str(pos[0]) + ";" + str(pos[1]))
                             undo_list.append(redo_list[-1])
                             redo_list.pop()
 
                         elif redo_list[-1][2] == "add":
-                            erase_tile(zoom, current_layer, offset, specific_tile=str(pos[0]) + ";" + str(pos[1]))
+
+                            erase_tile(current_layer, offset, mouse_rect, tile_size, sidebar_img, sidebar_hidden, mouse_over_gui,
+                                       specific_tile=str(pos[0]) + ";" + str(pos[1]))
                             undo_list.append(redo_list[-1])
                             redo_list.pop()
 
                         elif redo_list[-1][2] == "replace":
 
-                            draw_tile(zoom, redo_list[-1][1], offset, selection_=redo_list[-1][3], specific_tile=str(pos[0]) + ";" + str(pos[1]))
+                            draw_tile(redo_list[-1][1], offset, redo_list[-1][3], mouse_rect, tile_size, sidebar_img,
+                                      sidebar_hidden, mouse_over_gui, specific_tile=str(pos[0]) + ";" + str(pos[1]))
                             undo_list.append(redo_list[-1])
                             redo_list.pop()
 
@@ -1286,17 +1302,20 @@ while running:
                         pos[0], pos[1], = int(pos[0]), int(pos[1])
 
                         if undo_list[-1][2] == "remove":
-                            erase_tile(zoom, current_layer, offset, specific_tile=str(pos[0]) + ";" + str(pos[1]))
+                            erase_tile(current_layer, offset, mouse_rect, tile_size, sidebar_img, sidebar_hidden, mouse_over_gui,
+                                       specific_tile=str(pos[0]) + ";" + str(pos[1]))
                             redo_list.append(undo_list[-1])
                             undo_list.pop()
 
                         elif undo_list[-1][2] == "add":
-                            draw_tile(zoom, current_layer, offset, selection_=undo_list[-1][3], specific_tile=str(pos[0]) + ";" + str(pos[1]))
+                            draw_tile(current_layer, offset, undo_list[-1][3], mouse_rect, tile_size, sidebar_img, sidebar_hidden,
+                                      mouse_over_gui, specific_tile=str(pos[0]) + ";" + str(pos[1]))
                             redo_list.append(undo_list[-1])
                             undo_list.pop()
 
                         elif undo_list[-1][2] == "replace":
-                            draw_tile(zoom, undo_list[-1][1], offset, selection_=undo_list[-1][4], specific_tile=str(pos[0]) + ";" + str(pos[1]))
+                            draw_tile(undo_list[-1][1], offset, undo_list[-1][4], mouse_rect, tile_size, sidebar_img,
+                                      sidebar_hidden, mouse_over_gui, specific_tile=str(pos[0]) + ";" + str(pos[1]))
                             redo_list.append(undo_list[-1])
                             undo_list.pop()
 
@@ -1310,11 +1329,14 @@ while running:
         # Draw tiles
         if pg.mouse.get_pressed(3)[0]:
             if selection is not None:
-                calculate_line(mouse_rect.x, mouse_rect.y, mouse[0], mouse[1], draw_tile, zoom, current_layer, offset, selection)
+                calculate_line(mouse_rect.x, mouse_rect.y, mouse[0], mouse[1], mouse_rect,
+                               lambda: draw_tile(current_layer, offset, selection, mouse_rect, tile_size, sidebar_img,
+                                                 sidebar_hidden, mouse_over_gui))
 
         # Erases tiles
         elif pg.mouse.get_pressed(3)[2]:
-            calculate_line(mouse_rect.x, mouse_rect.y, mouse[0], mouse[1], erase_tile, zoom, current_layer, offset, selection)
+            calculate_line(mouse_rect.x, mouse_rect.y, mouse[0], mouse[1], mouse_rect,
+                           lambda: erase_tile(current_layer, offset, mouse_rect, tile_size, sidebar_img, sidebar_hidden, mouse_over_gui), )
 
         # Blitting -----------------------------------------------------------------------------------------------------------------------------------------------------
         if update:
@@ -1391,10 +1413,11 @@ while running:
 
         # Blits mouse tile
         if not pg.mouse.get_pressed(3)[2]:
-            if mouse[0] > sidebar_img.get_width() or sidebar_hidden:
+            if mouse[0] > sidebar_img.get_width() - 12 or sidebar_hidden:
                 mouse_scroll = [scroll[0] % tile_size, scroll[1] % tile_size]
 
                 if selection in tile_index:
+                    # Tints mouse tile
                     blitted_selection = tile_index[selection].copy()
                     tinted_selection = pg.Surface((blitted_selection.get_width(), blitted_selection.get_height()))
                     tinted_selection.fill((0, 0, 0))
@@ -1402,40 +1425,49 @@ while running:
                     blitted_selection.set_alpha(180)
                     pos = str(tile_position[0]) + ";" + str(tile_position[1])
 
-                    if chunk_pos in tile_map["map"]:
-                        if pos in tile_map["map"][chunk_pos]:
-                            for layer in tile_map["map"][chunk_pos][pos]:
-                                if tile_map["map"][chunk_pos][pos][layer][0] == selection:
-                                    blitted_selection.set_alpha(255)
-                                    tinted_selection.set_alpha(0)
-                                    break
-
-                    blitted_selection.blit(tinted_selection, (0, 0))
+                    map_or_mobs = None
 
                     mouse_tile_flag = True
+
+                    if chunk_pos in tile_map["mobs"]:
+                        if pos in tile_map["mobs"][chunk_pos]:
+                            map_or_mobs = "mobs"
+
                     if chunk_pos in tile_map["map"]:
                         if pos in tile_map["map"][chunk_pos]:
-                            for layer in tile_map["map"][chunk_pos][pos]:
-                                if layer > current_layer and mouse_tile_flag:
-                                    display.blit(blitted_selection, (round(((mouse[0] - offset[0]) + mouse_scroll[0]) / tile_size) * tile_size - mouse_scroll[0],
-                                                                     round(((mouse[1] - offset[1]) + mouse_scroll[1]) / tile_size) * tile_size - mouse_scroll[1]))
-                                    mouse_tile_flag = False
+                            map_or_mobs = "map"
 
-                                if tile_map["map"][chunk_pos][pos][layer][0] in tile_index:
-                                    display.blit((tile_index[tile_map["map"][chunk_pos][pos][layer][0]]),
-                                                 (int(tile_position[0] * tile_size) - scroll[0], int(tile_position[1] * tile_size) - scroll[1]))
+                    if map_or_mobs is not None:
+                        mouse_tile_flag = False
 
-                                else:
-                                    display.blit((tile_index["null"]), (int(tile_position[0] * tile_size) - scroll[0], int(tile_position[1] * tile_size) - scroll[1]))
+                        # If tile that mouse is over is the same as selection, then make mouse tile fully opaque
+                        if current_layer in tile_map[map_or_mobs][chunk_pos][pos] and tile_map[map_or_mobs][chunk_pos][pos][current_layer][0] == selection:
+                            blitted_selection.set_alpha(255)
+                            tinted_selection.set_alpha(0)
+
+                        blitted_selection.blit(tinted_selection, (0, 0))
+
+                        mouse_tile_layer_dict = copy.deepcopy(tile_map[map_or_mobs][chunk_pos][pos])
+
+                        if current_layer in mouse_tile_layer_dict:
+                            mouse_tile_layer_dict[current_layer].append(selection)
+                        else:
+                            mouse_tile_layer_dict[current_layer] = [selection]
+
+                        mouse_tile_layer_dict = dict(sorted(mouse_tile_layer_dict.items(), key=lambda j: int(j[0])))
+
+                        for layer in mouse_tile_layer_dict.values():
+
+                            for i in layer:
+                                display.blit((tile_index[i]), (int(tile_position[0] * tile_size) - scroll[0], int(tile_position[1] * tile_size) - scroll[1]))
 
                     if mouse_tile_flag:
                         display.blit(blitted_selection, (round(((mouse[0] - offset[0]) + mouse_scroll[0]) / tile_size) * tile_size - mouse_scroll[0],
                                                          round(((mouse[1] - offset[1]) + mouse_scroll[1]) / tile_size) * tile_size - mouse_scroll[1]))
 
-                else:
-                    if selection is not None:
-                        display.blit(tile_index["null"], (round(((mouse[0] - offset[0]) + mouse_scroll[0]) / tile_size) * tile_size - mouse_scroll[0],
-                                                          round(((mouse[1] - offset[1]) + mouse_scroll[1]) / tile_size) * tile_size - mouse_scroll[1]))
+                elif selection is not None:
+                    display.blit(tile_index["null"], (round(((mouse[0] - offset[0]) + mouse_scroll[0]) / tile_size) * tile_size - mouse_scroll[0],
+                                                      round(((mouse[1] - offset[1]) + mouse_scroll[1]) / tile_size) * tile_size - mouse_scroll[1]))
 
         if not sidebar_hidden:
             display.blit(sidebar_img, (0, 0))
@@ -1489,7 +1521,7 @@ while running:
 
         if not sidebar_hidden:
             for button in editor_button_list:
-                button.update(left_mouse_btn_down)
+                button.update(left_mouse_btn_up)
 
             if tiles_button.clicked:
                 tab = "tiles"
